@@ -605,21 +605,38 @@ namespace PoE2ModRPG
 
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
-            string message;
 
+            if (text.StartsWith("@"))
+            {
+                var adminMessage = text.Substring(1);
+                if (string.IsNullOrWhiteSpace(adminMessage))
+                    return HookResult.Handled;
+
+                var message = $"[CZAT ADMIN] {prefix} {player.PlayerName}: {adminMessage}";
+                var admins = Utilities.GetPlayers()
+                    .Where(p => _playerService.GetPlayer(p.SteamID)?.Rank.RankValue >= 1);
+
+                foreach (var admin in admins)
+                {
+                    admin.PrintToChat(message);
+                }
+                return HookResult.Handled;
+            }
+
+            string normalMessage;
             if (@event.Teamonly)
             {
-                message = $"{prefix} {player.PlayerName} (TEAM): {text}";
+                normalMessage = $"{prefix} {player.PlayerName} (TEAM): {text}";
                 var teamMembers = Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum);
                 foreach (var member in teamMembers)
                 {
-                    member.PrintToChat(message);
+                    member.PrintToChat(normalMessage);
                 }
             }
             else
             {
-                message = $"{prefix} {player.PlayerName}: {text}";
-                Server.PrintToChatAll(message);
+                normalMessage = $"{prefix} {player.PlayerName}: {text}";
+                Server.PrintToChatAll(normalMessage);
             }
 
             return HookResult.Handled;

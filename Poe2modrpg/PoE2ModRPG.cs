@@ -585,7 +585,7 @@ namespace PoE2ModRPG
         #region Chat Prefix
         private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
         {
-            var player = @event.Userid;
+            var player = Utilities.GetPlayerFromUserid(@event.Userid);
             if (player == null || !player.IsValid) return HookResult.Continue;
 
             var playerData = _playerService.GetPlayer(player.SteamID);
@@ -632,7 +632,7 @@ namespace PoE2ModRPG
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
 
-            player.PlayerPawn.Value.Clan = prefix;
+            player.Clan = prefix;
         }
         #endregion
 

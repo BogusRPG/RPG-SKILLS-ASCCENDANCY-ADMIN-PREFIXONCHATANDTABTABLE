@@ -622,7 +622,10 @@ namespace PoE2ModRPG
                 return;
 
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
-            string prefix = $"[{rankName}][LVL{playerData.Level}]";
+            string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
+            string teamColor = player.TeamNum == 2 ? ChatColors.LightOrange.ToString() : ChatColors.Blue.ToString();
+
+            string prefix = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
 
             if (text.StartsWith("@"))
             {
@@ -630,7 +633,7 @@ namespace PoE2ModRPG
                 if (string.IsNullOrWhiteSpace(adminMessage))
                     return;
 
-                var message = $"[CZAT ADMIN] {prefix} {player.PlayerName}: {adminMessage}";
+                var message = $"{ChatColors.LightRed}[CZAT ADMIN]{ChatColors.Default} {prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.LightGrey}{adminMessage}{ChatColors.Default}";
                 var admins = Utilities.GetPlayers()
                     .Where(p => _playerService.GetPlayer(p.SteamID)?.Rank.RankValue >= 1);
 
@@ -644,7 +647,7 @@ namespace PoE2ModRPG
             string normalMessage;
             if (teamOnly)
             {
-                normalMessage = $"{prefix} {player.PlayerName} (TEAM): {text}";
+                normalMessage = $"{prefix} {teamColor}{player.PlayerName}{ChatColors.Default} (TEAM): {ChatColors.LightGrey}{text}{ChatColors.Default}";
                 var teamMembers = Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum);
                 foreach (var member in teamMembers)
                 {
@@ -653,7 +656,7 @@ namespace PoE2ModRPG
             }
             else
             {
-                normalMessage = $"{prefix} {player.PlayerName}: {text}";
+                normalMessage = $"{prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.LightGrey}{text}{ChatColors.Default}";
                 Server.PrintToChatAll(normalMessage);
             }
         }

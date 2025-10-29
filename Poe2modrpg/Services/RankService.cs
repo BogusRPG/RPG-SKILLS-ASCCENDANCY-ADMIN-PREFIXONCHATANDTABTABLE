@@ -1,6 +1,7 @@
 using PoE2ModRPG.Database;
 using PoE2ModRPG.Models;
 using MySqlConnector;
+using CounterStrikeSharp.API.Modules.Utils;
 
 namespace PoE2ModRPG.Services
 {
@@ -54,6 +55,17 @@ namespace PoE2ModRPG.Services
                 2 => "Opiekun",
                 3 => "OWNER",
                 _ => "Gracz",
+            };
+        }
+
+        public string GetRankColor(int rankValue)
+        {
+            return rankValue switch
+            {
+                1 => ChatColors.Blue.ToString(),
+                2 => ChatColors.Purple.ToString(),
+                3 => ChatColors.Red.ToString(),
+                _ => ChatColors.Green.ToString(),
             };
         }
     }

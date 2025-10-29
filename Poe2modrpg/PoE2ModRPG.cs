@@ -90,11 +90,17 @@ namespace PoE2ModRPG
             AddCommand("cast", "Casts a skill", OnCastCommand);
             AddCommand("poe_cast", "Casts a skill", OnCastCommand);
 
+            AddCommand("dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
             AddCommand("poe_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
+            AddCommand("dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
             AddCommand("poe_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
+            AddCommand("zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
             AddCommand("poe_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
+            AddCommand("dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
             AddCommand("poe_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
+            AddCommand("zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
             AddCommand("poe_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
+            AddCommand("clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
             AddCommand("poe_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
 
             RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);

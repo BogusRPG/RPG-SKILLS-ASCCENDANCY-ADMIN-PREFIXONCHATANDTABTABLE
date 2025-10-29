@@ -34,6 +34,7 @@ namespace PoE2ModRPG
         private LevelingService _levelingService = null!;
         private SkillManager _skillManager = null!;
         private CooldownManager _cooldownManager = null!;
+        private AdminService _adminService = null!;
 
         public PluginConfig Config { get; set; } = new();
         public void OnConfigParsed(PluginConfig config) => Config = config;
@@ -61,6 +62,7 @@ namespace PoE2ModRPG
                 _skillManager.RegisterSkill(new Services.Skills.SpeedBoostSkill());
                 _skillManager.RegisterSkill(new Services.Skills.VampirismSkill());
                 _cooldownManager = new CooldownManager();
+                _adminService = new AdminService(_playerService, _levelingService, _dbManager);
                 Server.PrintToConsole("PoE2ModRPG: Plugin działa i DB init OK");
             }
             catch (Exception e)
@@ -87,6 +89,13 @@ namespace PoE2ModRPG
             AddCommand("poe_learn", "Learn a skill", OnLearnCommand);
             AddCommand("cast", "Casts a skill", OnCastCommand);
             AddCommand("poe_cast", "Casts a skill", OnCastCommand);
+
+            AddCommand("poe_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
+            AddCommand("poe_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
+            AddCommand("poe_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
+            AddCommand("poe_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
+            AddCommand("poe_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
+            AddCommand("poe_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
 
             RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
             RegisterEventHandler<EventBombPlanted>(OnBombPlanted);
@@ -464,6 +473,96 @@ namespace PoE2ModRPG
                 int regenAmount = 2 + (playerData.Intelligence / 5);
                 playerData.Mana = Math.Min(playerData.MaxMana, playerData.Mana + regenAmount);
             }
+        }
+        #endregion
+
+        #region Admin Commands
+        private bool IsAdmin(CCSPlayerController? caller)
+        {
+            if (caller == null) return false;
+            return Config.Admins.Contains(caller.SteamID);
+        }
+
+        private void OnGiveExpCommand(CCSPlayerController? caller, CommandInfo info)
+        {
+            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_dxp <nazwa_gracza> <ilość>"); return; }
+
+            var player = _adminService.FindPlayer(info.GetArg(1));
+            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+
+            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+
+            _adminService.GiveExperience(player, amount);
+            caller?.PrintToChat($"{Prefix} Dodałeś {amount} EXP graczowi {player.Name}.");
+        }
+
+        private void OnGiveSkillPointsCommand(CCSPlayerController? caller, CommandInfo info)
+        {
+            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_dskillpkt <nazwa_gracza> <ilość>"); return; }
+
+            var player = _adminService.FindPlayer(info.GetArg(1));
+            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+
+            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+
+            _adminService.GiveSkillPoints(player, amount);
+            caller?.PrintToChat($"{Prefix} Dodałeś {amount} punktów umiejętności graczowi {player.Name}.");
+        }
+
+        private void OnTakeSkillPointsCommand(CCSPlayerController? caller, CommandInfo info)
+        {
+            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_zskillpkt <nazwa_gracza> <ilość>"); return; }
+
+            var player = _adminService.FindPlayer(info.GetArg(1));
+            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+
+            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+
+            _adminService.TakeSkillPoints(player, amount);
+            caller?.PrintToChat($"{Prefix} Zabrałeś {amount} punktów umiejętności graczowi {player.Name}.");
+        }
+
+        private void OnGiveStatPointsCommand(CCSPlayerController? caller, CommandInfo info)
+        {
+            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_dstatpkt <nazwa_gracza> <ilość>"); return; }
+
+            var player = _adminService.FindPlayer(info.GetArg(1));
+            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+
+            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+
+            _adminService.GiveStatPoints(player, amount);
+            caller?.PrintToChat($"{Prefix} Dodałeś {amount} punktów statystyk graczowi {player.Name}.");
+        }
+
+        private void OnTakeStatPointsCommand(CCSPlayerController? caller, CommandInfo info)
+        {
+            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_zstatpkt <nazwa_gracza> <ilość>"); return; }
+
+            var player = _adminService.FindPlayer(info.GetArg(1));
+            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+
+            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+
+            _adminService.TakeStatPoints(player, amount);
+            caller?.PrintToChat($"{Prefix} Zabrałeś {amount} punktów statystyk graczowi {player.Name}.");
+        }
+
+        private void OnResetPlayerCommand(CCSPlayerController? caller, CommandInfo info)
+        {
+            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (info.ArgCount < 2) { caller?.PrintToChat($"{Prefix} Użycie: poe_clearall <nazwa_gracza>"); return; }
+
+            var player = _adminService.FindPlayer(info.GetArg(1));
+            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+
+            _adminService.ResetPlayerProgress(player);
+            caller?.PrintToChat($"{Prefix} Zresetowałeś postęp gracza {player.Name}.");
         }
         #endregion
 

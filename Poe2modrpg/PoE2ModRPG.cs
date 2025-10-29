@@ -14,6 +14,7 @@ using PoE2ModRPG.Models;
 using PoE2ModRPG.Services;
 using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 using MySqlConnector;
+using System.Linq;
 
 namespace PoE2ModRPG
 {
@@ -587,11 +588,11 @@ namespace PoE2ModRPG
         {
             var text = @event.Text.Trim();
             if (string.IsNullOrWhiteSpace(text))
-                return HookResult.Stop;
+                return HookResult.Handled;
 
             if (text.StartsWith("!") || text.StartsWith("/"))
             {
-                return HookResult.Stop;
+                return HookResult.Handled;
             }
 
             var player = Utilities.GetPlayerFromUserid(@event.Userid);
@@ -604,10 +605,24 @@ namespace PoE2ModRPG
 
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
+            string message;
 
-            Server.PrintToChatAll($"{prefix} {player.PlayerName}: {text}");
+            if (@event.Teamonly)
+            {
+                message = $"{prefix} {player.PlayerName} (TEAM): {text}";
+                var teamMembers = Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum);
+                foreach (var member in teamMembers)
+                {
+                    member.PrintToChat(message);
+                }
+            }
+            else
+            {
+                message = $"{prefix} {player.PlayerName}: {text}";
+                Server.PrintToChatAll(message);
+            }
 
-            return HookResult.Stop;
+            return HookResult.Handled;
         }
         #endregion
 

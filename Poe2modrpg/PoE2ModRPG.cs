@@ -35,6 +35,7 @@ namespace PoE2ModRPG
         private SkillManager _skillManager = null!;
         private CooldownManager _cooldownManager = null!;
         private AdminService _adminService = null!;
+        private RankService _rankService = null!;
 
         public PluginConfig Config { get; set; } = new();
         public void OnConfigParsed(PluginConfig config) => Config = config;
@@ -56,13 +57,14 @@ namespace PoE2ModRPG
                 _dbManager = new DatabaseManager(Config.Database);
                 _dbManager.InitializeDatabase();
                 _playerService = new PlayerService();
-                _levelingService = new LevelingService(_playerService, _dbManager);
+                _levelingService = new LevelingService(this, _playerService, _dbManager);
                 _skillManager = new SkillManager();
                 _skillManager.RegisterSkill(new Services.Skills.HealSkill());
                 _skillManager.RegisterSkill(new Services.Skills.SpeedBoostSkill());
                 _skillManager.RegisterSkill(new Services.Skills.VampirismSkill());
                 _cooldownManager = new CooldownManager();
                 _adminService = new AdminService(_playerService, _levelingService, _dbManager);
+                _rankService = new RankService(_dbManager);
                 Server.PrintToConsole("PoE2ModRPG: Plugin działa i DB init OK");
             }
             catch (Exception e)
@@ -111,6 +113,7 @@ namespace PoE2ModRPG
             RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
             RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
             RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
+            RegisterEventHandler<EventPlayerChat>(OnPlayerChat);
         }
 
         private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
@@ -118,8 +121,11 @@ namespace PoE2ModRPG
             var player = @event.Userid;
             if (player == null || !player.IsValid || player.IsBot) return HookResult.Continue;
 
+            _rankService.UpdatePlayerName(player.SteamID, player.PlayerName);
+
             var playerData = _dbManager.LoadPlayer(player.SteamID);
             playerData.Name = player.PlayerName;
+            playerData.Rank = _rankService.GetPlayerRank(player.SteamID);
             _playerService.AddPlayer(playerData);
 
             if (!_manaRegenTimers.ContainsKey(player.SteamID))
@@ -464,6 +470,8 @@ namespace PoE2ModRPG
                 pawn.MaxHealth = maxHealth;
                 pawn.Health = pawn.MaxHealth;
                 playerData.Mana = playerData.MaxMana;
+
+                UpdatePlayerPrefix(player);
             });
             return HookResult.Continue;
         }
@@ -483,15 +491,17 @@ namespace PoE2ModRPG
         #endregion
 
         #region Admin Commands
-        private bool IsAdmin(CCSPlayerController? caller)
+        private bool HasAdminPermission(CCSPlayerController? caller)
         {
             if (caller == null) return false;
-            return Config.Admins.Contains(caller.SteamID);
+            var playerData = _playerService.GetPlayer(caller.SteamID);
+            if (playerData == null) return false;
+            return playerData.Rank.RankValue >= 2;
         }
 
         private void OnGiveExpCommand(CCSPlayerController? caller, CommandInfo info)
         {
-            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
             if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_dxp <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
@@ -505,7 +515,7 @@ namespace PoE2ModRPG
 
         private void OnGiveSkillPointsCommand(CCSPlayerController? caller, CommandInfo info)
         {
-            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
             if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_dskillpkt <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
@@ -519,7 +529,7 @@ namespace PoE2ModRPG
 
         private void OnTakeSkillPointsCommand(CCSPlayerController? caller, CommandInfo info)
         {
-            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
             if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_zskillpkt <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
@@ -533,7 +543,7 @@ namespace PoE2ModRPG
 
         private void OnGiveStatPointsCommand(CCSPlayerController? caller, CommandInfo info)
         {
-            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
             if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_dstatpkt <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
@@ -547,7 +557,7 @@ namespace PoE2ModRPG
 
         private void OnTakeStatPointsCommand(CCSPlayerController? caller, CommandInfo info)
         {
-            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
             if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_zstatpkt <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
@@ -561,7 +571,7 @@ namespace PoE2ModRPG
 
         private void OnResetPlayerCommand(CCSPlayerController? caller, CommandInfo info)
         {
-            if (!IsAdmin(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
+            if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
             if (info.ArgCount < 2) { caller?.PrintToChat($"{Prefix} Użycie: poe_clearall <nazwa_gracza>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
@@ -569,6 +579,24 @@ namespace PoE2ModRPG
 
             _adminService.ResetPlayerProgress(player);
             caller?.PrintToChat($"{Prefix} Zresetowałeś postęp gracza {player.Name}.");
+        }
+        #endregion
+
+        #region Chat Prefix
+        private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
+        {
+            var player = @event.Userid;
+            if (player == null || !player.IsValid) return HookResult.Continue;
+
+            var playerData = _playerService.GetPlayer(player.SteamID);
+            if (playerData == null) return HookResult.Continue;
+
+            string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
+            string prefix = $"[{rankName}][LVL{playerData.Level}]";
+
+            Server.PrintToChatAll($"{prefix} {player.PlayerName}: {@event.Text}");
+
+            return HookResult.Stop;
         }
         #endregion
 
@@ -592,6 +620,19 @@ namespace PoE2ModRPG
                 }
             }
             return HookResult.Continue;
+        }
+        #endregion
+
+        #region Prefix Logic
+        public void UpdatePlayerPrefix(CCSPlayerController player)
+        {
+            var playerData = _playerService.GetPlayer(player.SteamID);
+            if (playerData == null) return;
+
+            string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
+            string prefix = $"[{rankName}][LVL{playerData.Level}]";
+
+            player.PlayerPawn.Value.Clan = prefix;
         }
         #endregion
 

@@ -41,5 +41,8 @@ namespace PoE2ModRPG.Models
 
         [NotMapped]
         public List<PlayerSkill> LearnedSkills { get; set; } = new();
+
+        [NotMapped]
+        public PlayerRank Rank { get; set; } = new();
     }
 }

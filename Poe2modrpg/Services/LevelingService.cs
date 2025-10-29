@@ -9,10 +9,12 @@ namespace PoE2ModRPG.Services
     {
         private readonly PlayerService _playerService;
         private readonly Database.DatabaseManager _dbManager;
+        private readonly PoE2ModRPG _plugin;
         private static readonly string Prefix = $" {ChatColors.Gold}[PoE2Mod]{ChatColors.Default}";
 
-        public LevelingService(PlayerService playerService, Database.DatabaseManager dbManager)
+        public LevelingService(PoE2ModRPG plugin, PlayerService playerService, Database.DatabaseManager dbManager)
         {
+            _plugin = plugin;
             _playerService = playerService;
             _dbManager = dbManager;
         }
@@ -27,8 +29,10 @@ namespace PoE2ModRPG.Services
                 player.PrintToChat($"{Prefix} {ChatColors.Green}+{amount} EXP{ChatColors.Default} za {reason}");
             }
 
+            bool leveledUp = false;
             while (playerData.Level < 100 && playerData.Exp >= RequiredExp(playerData.Level))
             {
+                leveledUp = true;
                 playerData.Exp -= RequiredExp(playerData.Level);
                 playerData.Level++;
                 playerData.StatPoints++;
@@ -41,6 +45,11 @@ namespace PoE2ModRPG.Services
                 {
                     Server.PrintToChatAll($"{Prefix} Gracz {player.PlayerName} awansował na poziom {playerData.Level}!");
                 }
+            }
+
+            if (leveledUp && player != null && player.IsValid)
+            {
+                _plugin.UpdatePlayerPrefix(player);
             }
 
             if (player != null && player.IsValid)

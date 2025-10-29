@@ -51,6 +51,13 @@ namespace PoE2ModRPG.Database
                                             FOREIGN KEY (player_steam_id) REFERENCES player_stats(steam_id) ON DELETE CASCADE
                                         );";
                 command.ExecuteNonQuery();
+
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS PlayerRanks (
+                                            SteamID BIGINT(20) NOT NULL PRIMARY KEY,
+                                            PlayerName VARCHAR(255) NOT NULL,
+                                            RankValue INT NOT NULL DEFAULT 0
+                                        );";
+                command.ExecuteNonQuery();
             }
             catch (Exception e)
             {

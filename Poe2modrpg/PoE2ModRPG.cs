@@ -114,7 +114,9 @@ namespace PoE2ModRPG
             RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
             RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
             RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
-            RegisterEventHandler<EventPlayerChat>(OnPlayerChat);
+
+            AddCommandListener("say", OnPlayerSay);
+            AddCommandListener("say_team", OnPlayerSayTeam);
         }
 
         private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
@@ -583,25 +585,37 @@ namespace PoE2ModRPG
         }
         #endregion
 
-        #region Chat Prefix
-        private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
+        #region Chat Handling
+        private HookResult OnPlayerSay(CCSPlayerController? player, CommandInfo info)
         {
-            var text = @event.Text.Trim();
-            if (string.IsNullOrWhiteSpace(text))
-                return HookResult.Handled;
-
-            if (text.StartsWith("!") || text.StartsWith("/"))
-            {
-                return HookResult.Handled;
-            }
-
-            var player = Utilities.GetPlayerFromUserid(@event.Userid);
             if (player == null || !player.IsValid)
                 return HookResult.Continue;
 
+            HandleChatMessage(player, info.GetArg(1), false);
+            return HookResult.Stop;
+        }
+
+        private HookResult OnPlayerSayTeam(CCSPlayerController? player, CommandInfo info)
+        {
+            if (player == null || !player.IsValid)
+                return HookResult.Continue;
+
+            HandleChatMessage(player, info.GetArg(1), true);
+            return HookResult.Stop;
+        }
+
+        private void HandleChatMessage(CCSPlayerController player, string text, bool teamOnly)
+        {
+            text = text.Trim();
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+
+            if (text.StartsWith("!") || text.StartsWith("/"))
+                return;
+
             var playerData = _playerService.GetPlayer(player.SteamID);
             if (playerData == null)
-                return HookResult.Continue;
+                return;
 
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
@@ -610,7 +624,7 @@ namespace PoE2ModRPG
             {
                 var adminMessage = text.Substring(1);
                 if (string.IsNullOrWhiteSpace(adminMessage))
-                    return HookResult.Handled;
+                    return;
 
                 var message = $"[CZAT ADMIN] {prefix} {player.PlayerName}: {adminMessage}";
                 var admins = Utilities.GetPlayers()
@@ -620,11 +634,11 @@ namespace PoE2ModRPG
                 {
                     admin.PrintToChat(message);
                 }
-                return HookResult.Handled;
+                return;
             }
 
             string normalMessage;
-            if (@event.Teamonly)
+            if (teamOnly)
             {
                 normalMessage = $"{prefix} {player.PlayerName} (TEAM): {text}";
                 var teamMembers = Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum);
@@ -638,8 +652,6 @@ namespace PoE2ModRPG
                 normalMessage = $"{prefix} {player.PlayerName}: {text}";
                 Server.PrintToChatAll(normalMessage);
             }
-
-            return HookResult.Handled;
         }
         #endregion
 

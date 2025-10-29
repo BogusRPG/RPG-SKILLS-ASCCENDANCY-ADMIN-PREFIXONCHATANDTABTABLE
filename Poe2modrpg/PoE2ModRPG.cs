@@ -585,16 +585,27 @@ namespace PoE2ModRPG
         #region Chat Prefix
         private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
         {
+            var text = @event.Text.Trim();
+            if (string.IsNullOrWhiteSpace(text))
+                return HookResult.Stop;
+
+            if (text.StartsWith("!") || text.StartsWith("/"))
+            {
+                return HookResult.Stop;
+            }
+
             var player = Utilities.GetPlayerFromUserid(@event.Userid);
-            if (player == null || !player.IsValid) return HookResult.Continue;
+            if (player == null || !player.IsValid)
+                return HookResult.Continue;
 
             var playerData = _playerService.GetPlayer(player.SteamID);
-            if (playerData == null) return HookResult.Continue;
+            if (playerData == null)
+                return HookResult.Continue;
 
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
 
-            Server.PrintToChatAll($"{prefix} {player.PlayerName}: {@event.Text}");
+            Server.PrintToChatAll($"{prefix} {player.PlayerName}: {text}");
 
             return HookResult.Stop;
         }

@@ -14,7 +14,6 @@ using PoE2ModRPG.Models;
 using PoE2ModRPG.Services;
 using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 using MySqlConnector;
-using CounterStrikeSharp.API.Modules.Utils;
 
 namespace PoE2ModRPG
 {
@@ -259,12 +258,12 @@ namespace PoE2ModRPG
             if (playerData.StatPoints >= pointsToAdd)
             {
                 string statName = "";
-                ChatColor statColor = ChatColors.Default;
+                string statColor = ChatColors.Default.ToString();
                 switch(stat)
                 {
-                    case "str": playerData.Strength += pointsToAdd; statName = "Siły"; statColor = ChatColors.Red; break;
-                    case "int": playerData.Intelligence += pointsToAdd; statName = "Inteligencji"; statColor = ChatColors.Blue; break;
-                    case "dex": playerData.Dexterity += pointsToAdd; statName = "Zręczności"; statColor = ChatColors.Green; break;
+                    case "str": playerData.Strength += pointsToAdd; statName = "Siły"; statColor = ChatColors.Red.ToString(); break;
+                    case "int": playerData.Intelligence += pointsToAdd; statName = "Inteligencji"; statColor = ChatColors.Blue.ToString(); break;
+                    case "dex": playerData.Dexterity += pointsToAdd; statName = "Zręczności"; statColor = ChatColors.Green.ToString(); break;
                 }
                 playerData.StatPoints -= pointsToAdd;
                 caller.PrintToChat($"{Prefix} Dodałeś {pointsToAdd} pkt. do {statColor}{statName}{ChatColors.Default}. Zostało ci {playerData.StatPoints} pkt.");

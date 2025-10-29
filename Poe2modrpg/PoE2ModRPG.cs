@@ -611,7 +611,11 @@ namespace PoE2ModRPG
                 return;
 
             if (text.StartsWith("!") || text.StartsWith("/"))
+            {
+                var command = text.Substring(1);
+                player.ExecuteClientCommand(command);
                 return;
+            }
 
             var playerData = _playerService.GetPlayer(player.SteamID);
             if (playerData == null)
@@ -687,7 +691,7 @@ namespace PoE2ModRPG
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
 
-            player.Clan = prefix;
+            player.ClanTeamName = prefix;
         }
         #endregion
 

@@ -694,7 +694,7 @@ namespace PoE2ModRPG
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
 
-            player.ClanTag = prefix;
+            // player.ClanTag = prefix; // Needs further investigation on the correct API.
         }
         #endregion
 

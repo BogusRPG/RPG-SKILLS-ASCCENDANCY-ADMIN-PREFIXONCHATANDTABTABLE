@@ -4,6 +4,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes;
 using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Events;
 using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
@@ -74,36 +75,36 @@ namespace PoE2ModRPG
                 throw;
             }
 
-            AddCommand("staty", "Pokazuje statystyki", OnStatsCommand);
+            AddCommand("staty", "Pokazuje statystyki", OnStatsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_staty", "Pokazuje statystyki", OnStatsCommand);
-            AddCommand("str", "Dodaje punkty do Siły", OnStrCommand);
+            AddCommand("str", "Dodaje punkty do Siły", OnStrCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_str", "Dodaje punkty do Siły", OnStrCommand);
-            AddCommand("int", "Dodaje punkty do Inteligencji", OnIntCommand);
+            AddCommand("int", "Dodaje punkty do Inteligencji", OnIntCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_int", "Dodaje punkty do Inteligencji", OnIntCommand);
-            AddCommand("dex", "Dodaje punkty do Zręczności", OnDexCommand);
+            AddCommand("dex", "Dodaje punkty do Zręczności", OnDexCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_dex", "Dodaje punkty do Zręczności", OnDexCommand);
-            AddCommand("reset", "Resetuje statystyki", OnResetCommand);
+            AddCommand("reset", "Resetuje statystyki", OnResetCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_reset", "Resetuje statystyki", OnResetCommand);
             AddCommand("dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
             AddCommand("poe_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
-            AddCommand("skills", "Shows available skills", OnSkillsCommand);
+            AddCommand("skills", "Shows available skills", OnSkillsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_skills", "Shows available skills", OnSkillsCommand);
-            AddCommand("learn", "Learn a skill", OnLearnCommand);
+            AddCommand("learn", "Learn a skill", OnLearnCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_learn", "Learn a skill", OnLearnCommand);
-            AddCommand("cast", "Casts a skill", OnCastCommand);
+            AddCommand("cast", "Casts a skill", OnCastCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_cast", "Casts a skill", OnCastCommand);
 
-            AddCommand("dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
+            AddCommand("dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
-            AddCommand("dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
+            AddCommand("dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
-            AddCommand("zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
+            AddCommand("zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
-            AddCommand("dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
+            AddCommand("dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
-            AddCommand("zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
+            AddCommand("zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
-            AddCommand("clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
+            AddCommand("clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("poe_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
 
             RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
@@ -694,7 +695,7 @@ namespace PoE2ModRPG
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
 
-            // player.ClanTag = prefix; // Needs further investigation on the correct API.
+            Server.ExecuteCommand($"sv_setsteamaccount {player.SteamID} \"{prefix}\"");
         }
         #endregion
 

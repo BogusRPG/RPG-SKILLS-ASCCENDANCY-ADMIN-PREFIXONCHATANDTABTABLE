@@ -119,7 +119,6 @@ namespace PoE2ModRPG
             RegisterEventHandler<EventPlayerChat>(OnPlayerChat);
         }
 
-        [GameEventHandler]
         private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
         {
             var player = Utilities.GetPlayerFromUserid(@event.Userid);

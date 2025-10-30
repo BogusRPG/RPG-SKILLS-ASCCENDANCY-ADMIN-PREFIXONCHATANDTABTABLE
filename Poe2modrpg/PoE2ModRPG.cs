@@ -143,7 +143,7 @@ namespace PoE2ModRPG
 
         private HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
         {
-            var player = @event.Player;
+            var player = Utilities.GetPlayerFromUserid(@event.Userid);
             if (player == null || !player.IsValid) return HookResult.Continue;
 
             var playerData = _playerService.GetPlayer(player.SteamID);
@@ -165,7 +165,7 @@ namespace PoE2ModRPG
         {
             var attacker = ev.Attacker;
 
-            if (attacker != null && attacker.IsValid && ev.Userid != null && attacker.PlayerName != ev.Userid.PlayerName)
+            if (attacker != null && attacker.IsValid && attacker != ev.Userid)
             {
                 var playerData = _playerService.GetPlayer(attacker.SteamID);
                 if (playerData != null)
@@ -194,7 +194,7 @@ namespace PoE2ModRPG
         #region Simple Event Handlers
         private HookResult OnBombPlanted(EventBombPlanted ev, GameEventInfo info)
         {
-            var planter = Utilities.GetPlayerFromUserid(ev.Userid);
+            var planter = ev.Userid;
             if (planter != null && planter.IsValid)
             {
                 var playerData = _playerService.GetPlayer(planter.SteamID);
@@ -208,7 +208,7 @@ namespace PoE2ModRPG
 
         private HookResult OnBombDefused(EventBombDefused ev, GameEventInfo info)
         {
-            var defuser = Utilities.GetPlayerFromUserid(ev.Userid);
+            var defuser = ev.Userid;
             if (defuser != null && defuser.IsValid)
             {
                 var playerData = _playerService.GetPlayer(defuser.SteamID);
@@ -458,7 +458,7 @@ namespace PoE2ModRPG
         #region Other Logic
         private HookResult OnPlayerSpawn(EventPlayerSpawn ev, GameEventInfo info)
         {
-            var player = Utilities.GetPlayerFromUserid(ev.Userid);
+            var player = ev.Userid;
             if (player == null || !player.IsValid || player.IsBot) return HookResult.Continue;
 
             var playerData = _playerService.GetPlayer(player.SteamID);
@@ -672,8 +672,7 @@ namespace PoE2ModRPG
         private HookResult OnPlayerHurt(EventPlayerHurt ev, GameEventInfo info)
         {
             var attacker = ev.Attacker;
-            var victim = Utilities.GetPlayerFromUserid(ev.Userid);
-            if (attacker == null || !attacker.IsValid || attacker == victim) return HookResult.Continue;
+            if (attacker == null || !attacker.IsValid || attacker == ev.Userid) return HookResult.Continue;
 
             var activeEffect = _activeVampirismEffects.FirstOrDefault(e => e.PlayerSteamId == attacker.SteamID);
             if (activeEffect != null)

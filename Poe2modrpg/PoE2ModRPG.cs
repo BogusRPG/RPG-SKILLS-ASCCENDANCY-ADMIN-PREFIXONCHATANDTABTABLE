@@ -125,7 +125,7 @@ namespace PoE2ModRPG
         {
             if (player == null || !player.IsValid) return HookResult.Continue;
 
-            string message = info.ArgString.Trim();
+            string message = info.ArgString.Trim().Trim('"');
             if (string.IsNullOrEmpty(message)) return HookResult.Stop;
 
             var playerData = _playerService.GetPlayer(player.SteamID);
@@ -183,7 +183,7 @@ namespace PoE2ModRPG
         {
             if (player == null || !player.IsValid) return HookResult.Continue;
 
-            string message = info.ArgString.Trim();
+            string message = info.ArgString.Trim().Trim('"');
             if (string.IsNullOrEmpty(message)) return HookResult.Stop;
 
             if (message.StartsWith("!") || message.StartsWith("/"))

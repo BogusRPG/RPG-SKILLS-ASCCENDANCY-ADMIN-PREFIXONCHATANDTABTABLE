@@ -163,7 +163,7 @@ namespace PoE2ModRPG
             if (message.StartsWith("!") || message.StartsWith("/"))
             {
                 string command = message.Substring(1);
-                player.ExecuteClientCommand(command);
+                AddTimer(0.0f, () => player.ExecuteClientCommand(command));
                 return HookResult.Stop;
             }
 
@@ -189,7 +189,7 @@ namespace PoE2ModRPG
             if (message.StartsWith("!") || message.StartsWith("/"))
             {
                 string command = message.Substring(1);
-                player.ExecuteClientCommand(command);
+                AddTimer(0.0f, () => player.ExecuteClientCommand(command));
                 return HookResult.Stop;
             }
 

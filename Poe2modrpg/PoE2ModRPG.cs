@@ -19,7 +19,7 @@ using System.Linq;
 
 namespace PoE2ModRPG
 {
-    [MinimumApiVersion(343)]
+    [MinimumApiVersion(344)]
     public class PoE2ModRPG : BasePlugin, IPluginConfig<PluginConfig>, IPoe2ModApi
     {
         public override string ModuleName => "PoE2ModRPG";
@@ -76,36 +76,36 @@ namespace PoE2ModRPG
             }
 
             AddCommand("staty", "Pokazuje statystyki", OnStatsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_staty", "Pokazuje statystyki", OnStatsCommand);
+            AddCommand("poe_staty", "Pokazuje statystyki", OnStatsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("str", "Dodaje punkty do Siły", OnStrCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_str", "Dodaje punkty do Siły", OnStrCommand);
+            AddCommand("poe_str", "Dodaje punkty do Siły", OnStrCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("int", "Dodaje punkty do Inteligencji", OnIntCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_int", "Dodaje punkty do Inteligencji", OnIntCommand);
+            AddCommand("poe_int", "Dodaje punkty do Inteligencji", OnIntCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("dex", "Dodaje punkty do Zręczności", OnDexCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_dex", "Dodaje punkty do Zręczności", OnDexCommand);
+            AddCommand("poe_dex", "Dodaje punkty do Zręczności", OnDexCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("reset", "Resetuje statystyki", OnResetCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_reset", "Resetuje statystyki", OnResetCommand);
-            AddCommand("dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
-            AddCommand("poe_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
+            AddCommand("poe_reset", "Resetuje statystyki", OnResetCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("dbtest", "Test zapisu do bazy danych", OnDbTestCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("poe_dbtest", "Test zapisu do bazy danych", OnDbTestCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("skills", "Shows available skills", OnSkillsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_skills", "Shows available skills", OnSkillsCommand);
+            AddCommand("poe_skills", "Shows available skills", OnSkillsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("learn", "Learn a skill", OnLearnCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_learn", "Learn a skill", OnLearnCommand);
+            AddCommand("poe_learn", "Learn a skill", OnLearnCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("cast", "Casts a skill", OnCastCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_cast", "Casts a skill", OnCastCommand);
+            AddCommand("poe_cast", "Casts a skill", OnCastCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
 
             AddCommand("dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
+            AddCommand("poe_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
+            AddCommand("poe_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
+            AddCommand("poe_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
+            AddCommand("poe_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
+            AddCommand("poe_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
             AddCommand("clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
+            AddCommand("poe_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
 
             RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
             RegisterEventHandler<EventBombPlanted>(OnBombPlanted);
@@ -123,6 +123,7 @@ namespace PoE2ModRPG
         private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
         {
             var player = @event.Userid;
+
             if (player == null || !player.IsValid || player.IsBot) return HookResult.Continue;
 
             _rankService.UpdatePlayerName(player.SteamID, player.PlayerName);
@@ -142,7 +143,7 @@ namespace PoE2ModRPG
 
         private HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
         {
-            var player = @event.Userid;
+            var player = @event.Player;
             if (player == null || !player.IsValid) return HookResult.Continue;
 
             var playerData = _playerService.GetPlayer(player.SteamID);
@@ -163,6 +164,7 @@ namespace PoE2ModRPG
         private HookResult OnPlayerDeath(EventPlayerDeath ev, GameEventInfo info)
         {
             var attacker = ev.Attacker;
+
             if (attacker != null && attacker.IsValid && attacker != ev.Userid)
             {
                 var playerData = _playerService.GetPlayer(attacker.SteamID);
@@ -192,7 +194,7 @@ namespace PoE2ModRPG
         #region Simple Event Handlers
         private HookResult OnBombPlanted(EventBombPlanted ev, GameEventInfo info)
         {
-            var planter = ev.Userid;
+            var planter = Utilities.GetPlayerFromUserid(ev.Userid);
             if (planter != null && planter.IsValid)
             {
                 var playerData = _playerService.GetPlayer(planter.SteamID);
@@ -206,7 +208,7 @@ namespace PoE2ModRPG
 
         private HookResult OnBombDefused(EventBombDefused ev, GameEventInfo info)
         {
-            var defuser = ev.Userid;
+            var defuser = Utilities.GetPlayerFromUserid(ev.Userid);
             if (defuser != null && defuser.IsValid)
             {
                 var playerData = _playerService.GetPlayer(defuser.SteamID);
@@ -456,7 +458,7 @@ namespace PoE2ModRPG
         #region Other Logic
         private HookResult OnPlayerSpawn(EventPlayerSpawn ev, GameEventInfo info)
         {
-            var player = ev.Userid;
+            var player = Utilities.GetPlayerFromUserid(ev.Userid);
             if (player == null || !player.IsValid || player.IsBot) return HookResult.Continue;
 
             var playerData = _playerService.GetPlayer(player.SteamID);
@@ -670,7 +672,8 @@ namespace PoE2ModRPG
         private HookResult OnPlayerHurt(EventPlayerHurt ev, GameEventInfo info)
         {
             var attacker = ev.Attacker;
-            if (attacker == null || !attacker.IsValid || attacker == ev.Userid) return HookResult.Continue;
+            var victim = Utilities.GetPlayerFromUserid(ev.Userid);
+            if (attacker == null || !attacker.IsValid || attacker == victim) return HookResult.Continue;
 
             var activeEffect = _activeVampirismEffects.FirstOrDefault(e => e.PlayerSteamId == attacker.SteamID);
             if (activeEffect != null)

@@ -623,7 +623,7 @@ namespace PoE2ModRPG
 
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
-            string teamColor = player.TeamNum == 2 ? ChatColors.LightOrange.ToString() : ChatColors.Blue.ToString();
+            string teamColor = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
 
             string prefix = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
 
@@ -633,7 +633,7 @@ namespace PoE2ModRPG
                 if (string.IsNullOrWhiteSpace(adminMessage))
                     return;
 
-                var message = $"{ChatColors.LightRed}[CZAT ADMIN]{ChatColors.Default} {prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.LightGrey}{adminMessage}{ChatColors.Default}";
+                var message = $"{ChatColors.LightRed}[CZAT ADMIN]{ChatColors.Default} {prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.Grey}{adminMessage}{ChatColors.Default}";
                 var admins = Utilities.GetPlayers()
                     .Where(p => _playerService.GetPlayer(p.SteamID)?.Rank.RankValue >= 1);
 
@@ -647,7 +647,7 @@ namespace PoE2ModRPG
             string normalMessage;
             if (teamOnly)
             {
-                normalMessage = $"{prefix} {teamColor}{player.PlayerName}{ChatColors.Default} (TEAM): {ChatColors.LightGrey}{text}{ChatColors.Default}";
+                normalMessage = $"{prefix} {teamColor}{player.PlayerName}{ChatColors.Default} (TEAM): {ChatColors.Grey}{text}{ChatColors.Default}";
                 var teamMembers = Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum);
                 foreach (var member in teamMembers)
                 {
@@ -656,7 +656,7 @@ namespace PoE2ModRPG
             }
             else
             {
-                normalMessage = $"{prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.LightGrey}{text}{ChatColors.Default}";
+                normalMessage = $"{prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.Grey}{text}{ChatColors.Default}";
                 Server.PrintToChatAll(normalMessage);
             }
         }
@@ -694,7 +694,7 @@ namespace PoE2ModRPG
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
 
-            player.ClanTeamName = prefix;
+            player.ClanTag = prefix;
         }
         #endregion
 

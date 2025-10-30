@@ -76,36 +76,20 @@ namespace PoE2ModRPG
                 throw;
             }
 
-            AddCommand("staty", "Pokazuje statystyki", OnStatsCommand);
             AddCommand("css_staty", "Pokazuje statystyki", OnStatsCommand);
-            AddCommand("str", "Dodaje punkty do Siły", OnStrCommand);
             AddCommand("css_str", "Dodaje punkty do Siły", OnStrCommand);
-            AddCommand("int", "Dodaje punkty do Inteligencji", OnIntCommand);
             AddCommand("css_int", "Dodaje punkty do Inteligencji", OnIntCommand);
-            AddCommand("dex", "Dodaje punkty do Zręczności", OnDexCommand);
             AddCommand("css_dex", "Dodaje punkty do Zręczności", OnDexCommand);
-            AddCommand("reset", "Resetuje statystyki", OnResetCommand);
             AddCommand("css_reset", "Resetuje statystyki", OnResetCommand);
-            AddCommand("dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
             AddCommand("css_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
-            AddCommand("skills", "Shows available skills", OnSkillsCommand);
             AddCommand("css_skills", "Shows available skills", OnSkillsCommand);
-            AddCommand("learn", "Learn a skill", OnLearnCommand);
             AddCommand("css_learn", "Learn a skill", OnLearnCommand);
-            AddCommand("cast", "Casts a skill", OnCastCommand);
             AddCommand("css_cast", "Casts a skill", OnCastCommand);
-
-            AddCommand("dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
             AddCommand("css_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
-            AddCommand("dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
             AddCommand("css_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
-            AddCommand("zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
             AddCommand("css_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
-            AddCommand("dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
             AddCommand("css_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
-            AddCommand("zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
             AddCommand("css_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
-            AddCommand("clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
             AddCommand("css_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
 
             RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
@@ -117,16 +101,80 @@ namespace PoE2ModRPG
             RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
             RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
 
-            AddCommandListener("say", OnPlayerSay);
-            AddCommandListener("say_team", OnPlayerSayTeam);
+            RegisterEventHandler<EventPlayerChat>(OnPlayerChat);
         }
 
-        private HookResult OnPlayerSay(CCSPlayerController? player, CommandInfo info)
+        private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
         {
-            if (player == null || !player.IsValid) return HookResult.Continue;
+            var player = @event.Userid;
+            var message = @event.Text;
 
-            string message = info.ArgString.Trim().Trim('"');
-            if (string.IsNullOrEmpty(message)) return HookResult.Stop;
+            if (player == null || !player.IsValid || string.IsNullOrWhiteSpace(message))
+            {
+                return HookResult.Stop;
+            }
+
+            if (message.StartsWith("!") || message.StartsWith("/"))
+            {
+                var parts = message.Substring(1).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var command = parts.Length > 0 ? parts[0].ToLower() : string.Empty;
+                var args = parts.Skip(1).ToArray();
+
+                switch (command)
+                {
+                    case "staty":
+                        OnStatsCommand(player, args);
+                        break;
+                    case "str":
+                        OnStrCommand(player, args);
+                        break;
+                    case "int":
+                        OnIntCommand(player, args);
+                        break;
+                    case "dex":
+                        OnDexCommand(player, args);
+                        break;
+                    case "reset":
+                        OnResetCommand(player, args);
+                        break;
+                    case "skills":
+                        OnSkillsCommand(player, args);
+                        break;
+                    case "learn":
+                        OnLearnCommand(player, args);
+                        break;
+                    case "cast":
+                        OnCastCommand(player, args);
+                        break;
+
+                    // Admin Commands
+                    case "dxp":
+                        if (player.IsAdmin(_playerService)) OnGiveExpCommand(player, args);
+                        else player.PrintToChat($"{Prefix} Nie masz uprawnień.");
+                        break;
+                    case "dskillpkt":
+                        if (player.IsAdmin(_playerService)) OnGiveSkillPointsCommand(player, args);
+                        else player.PrintToChat($"{Prefix} Nie masz uprawnień.");
+                        break;
+                    case "zskillpkt":
+                        if (player.IsAdmin(_playerService)) OnTakeSkillPointsCommand(player, args);
+                        else player.PrintToChat($"{Prefix} Nie masz uprawnień.");
+                        break;
+                    case "dstatpkt":
+                        if (player.IsAdmin(_playerService)) OnGiveStatPointsCommand(player, args);
+                        else player.PrintToChat($"{Prefix} Nie masz uprawnień.");
+                        break;
+                    case "zstatpkt":
+                        if (player.IsAdmin(_playerService)) OnTakeStatPointsCommand(player, args);
+                        else player.PrintToChat($"{Prefix} Nie masz uprawnień.");
+                        break;
+                    case "clearall":
+                        if (player.IsAdmin(_playerService)) OnResetPlayerCommand(player, args);
+                        else player.PrintToChat($"{Prefix} Nie masz uprawnień.");
+                        break;
+                }
+                return HookResult.Stop;
+            }
 
             var playerData = _playerService.GetPlayer(player.SteamID);
             if (playerData == null) return HookResult.Stop;
@@ -159,11 +207,20 @@ namespace PoE2ModRPG
                 return HookResult.Stop;
             }
 
-            // --- Commands ---
-            if (message.StartsWith("!") || message.StartsWith("/"))
+            // --- Team Chat ---
+            if (@event.Teamonly)
             {
-                string command = message.Substring(1);
-                AddTimer(0.0f, () => player.ExecuteClientCommand(command));
+                string teamPrefix = $"{ChatColors.Blue}[TEAM]{ChatColors.Default}";
+                string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
+                string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
+                string teamColor = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
+                string playerPrefix = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
+                string formatted = $"{teamPrefix} {playerPrefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {message}";
+
+                foreach (var p in Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum && p.IsValid))
+                {
+                    p.PrintToChat(formatted);
+                }
                 return HookResult.Stop;
             }
 
@@ -172,40 +229,9 @@ namespace PoE2ModRPG
             string rankColorRegular = _rankService.GetRankColor(playerData.Rank.RankValue);
             string teamColorRegular = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
             string prefixRegular = $"[{rankColorRegular}{rankNameRegular}{ChatColors.Default}][LVL{playerData.Level}]";
-            string formatted = $"{prefixRegular} {teamColorRegular}{player.PlayerName}{ChatColors.Default}: {message}";
+            string formattedMessage = $"{prefixRegular} {teamColorRegular}{player.PlayerName}{ChatColors.Default}: {message}";
 
-            Server.PrintToChatAll(formatted);
-
-            return HookResult.Stop;
-        }
-
-        private HookResult OnPlayerSayTeam(CCSPlayerController? player, CommandInfo info)
-        {
-            if (player == null || !player.IsValid) return HookResult.Continue;
-
-            string message = info.ArgString.Trim().Trim('"');
-            if (string.IsNullOrEmpty(message)) return HookResult.Stop;
-
-            if (message.StartsWith("!") || message.StartsWith("/"))
-            {
-                string command = message.Substring(1);
-                AddTimer(0.0f, () => player.ExecuteClientCommand(command));
-                return HookResult.Stop;
-            }
-
-            var playerData = _playerService.GetPlayer(player.SteamID);
-            if (playerData == null) return HookResult.Stop;
-
-            string rankNameRegular = _rankService.GetRankName(playerData.Rank.RankValue);
-            string rankColorRegular = _rankService.GetRankColor(playerData.Rank.RankValue);
-            string teamColorRegular = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
-            string prefixRegular = $"[{rankColorRegular}{rankNameRegular}{ChatColors.Default}][LVL{playerData.Level}]";
-            string formatted = $"{prefixRegular} {teamColorRegular}{player.PlayerName}{ChatColors.Default}: {message}";
-
-            foreach (var p in Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum && p.IsValid))
-            {
-                p.PrintToChat(formatted);
-            }
+            Server.PrintToChatAll(formattedMessage);
 
             return HookResult.Stop;
         }
@@ -329,7 +355,7 @@ namespace PoE2ModRPG
         #endregion
 
         #region Commands
-        private void OnStatsCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnStatsCommand(CCSPlayerController? caller, string[] args)
         {
             if (caller == null || !caller.IsValid || !caller.PlayerPawn.IsValid) return;
             var playerData = _playerService.GetPlayer(caller.SteamID);
@@ -358,25 +384,25 @@ namespace PoE2ModRPG
             }
         }
 
-        private void OnStrCommand(CCSPlayerController? caller, CommandInfo info) => AllocateStatPoint(caller, info, "str");
-        private void OnIntCommand(CCSPlayerController? caller, CommandInfo info) => AllocateStatPoint(caller, info, "int");
-        private void OnDexCommand(CCSPlayerController? caller, CommandInfo info) => AllocateStatPoint(caller, info, "dex");
+        private void OnStrCommand(CCSPlayerController? caller, string[] args) => AllocateStatPoint(caller, args, "str");
+        private void OnIntCommand(CCSPlayerController? caller, string[] args) => AllocateStatPoint(caller, args, "int");
+        private void OnDexCommand(CCSPlayerController? caller, string[] args) => AllocateStatPoint(caller, args, "dex");
 
-        private void AllocateStatPoint(CCSPlayerController? caller, CommandInfo info, string stat)
+        private void AllocateStatPoint(CCSPlayerController? caller, string[] args, string stat)
         {
             if (caller == null) return;
             var playerData = _playerService.GetPlayer(caller.SteamID);
             if (playerData == null) return;
 
             int pointsToAdd = 1;
-            if (info.ArgCount > 1 && int.TryParse(info.GetArg(1), out int parsedPoints) && parsedPoints > 0)
+            if (args.Length > 0 && int.TryParse(args[0], out int parsedPoints) && parsedPoints > 0)
                 pointsToAdd = parsedPoints;
 
             if (playerData.StatPoints >= pointsToAdd)
             {
                 string statName = "";
                 string statColor = ChatColors.Default.ToString();
-                switch(stat)
+                switch (stat)
                 {
                     case "str": playerData.Strength += pointsToAdd; statName = "Siły"; statColor = ChatColors.Red.ToString(); break;
                     case "int": playerData.Intelligence += pointsToAdd; statName = "Inteligencji"; statColor = ChatColors.Blue.ToString(); break;
@@ -392,7 +418,7 @@ namespace PoE2ModRPG
             }
         }
 
-        private void OnResetCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnResetCommand(CCSPlayerController? caller, string[] args)
         {
             if (caller == null) return;
             var playerData = _playerService.GetPlayer(caller.SteamID);
@@ -408,6 +434,7 @@ namespace PoE2ModRPG
             _dbManager.SavePlayer(playerData);
         }
 
+        // This is a console-only command, so it keeps CommandInfo
         private void OnDbTestCommand(CCSPlayerController? caller, CommandInfo info)
         {
             if (caller == null || !caller.IsValid) return;
@@ -428,7 +455,7 @@ namespace PoE2ModRPG
             }
         }
 
-        private void OnSkillsCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnSkillsCommand(CCSPlayerController? caller, string[] args)
         {
             if (caller == null) return;
             caller.PrintToChat($"{Prefix} Dostępne Umiejętności:");
@@ -438,15 +465,15 @@ namespace PoE2ModRPG
             }
         }
 
-        private void OnLearnCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnLearnCommand(CCSPlayerController? caller, string[] args)
         {
-            if (caller == null || info.ArgCount < 2)
+            if (caller == null || args.Length < 1)
             {
                 caller?.PrintToChat($"{Prefix} Użycie: /learn <nazwa_umiejętności>");
                 return;
             }
 
-            var skillName = info.GetArg(1);
+            var skillName = args[0];
             LearnSkill(caller, skillName);
         }
 
@@ -498,15 +525,15 @@ namespace PoE2ModRPG
             _dbManager.SavePlayer(playerData);
         }
 
-        private void OnCastCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnCastCommand(CCSPlayerController? caller, string[] args)
         {
-            if (caller == null || info.ArgCount < 2)
+            if (caller == null || args.Length < 1)
             {
                 caller?.PrintToChat($"{Prefix} Użycie: /cast <nazwa_umiejętności>");
                 return;
             }
 
-            var skillName = info.GetArg(1);
+            var skillName = args[0];
             var playerData = _playerService.GetPlayer(caller.SteamID);
             if (playerData == null) return;
 
@@ -587,86 +614,86 @@ namespace PoE2ModRPG
         #endregion
 
         #region Admin Commands
-        private void OnGiveExpCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnGiveExpCommand(CCSPlayerController? caller, string[] args)
         {
-            if (caller == null || !caller.IsAdmin(_playerService)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_dxp <nazwa_gracza> <ilość>"); return; }
+            if (caller == null) return;
+            if (args.Length < 2) { caller.PrintToChat($"{Prefix} Użycie: /dxp <nazwa_gracza> <ilość>"); return; }
 
-            var player = _adminService.FindPlayer(info.GetArg(1));
-            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+            var player = _adminService.FindPlayer(args[0]);
+            if (player == null) { caller.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
 
-            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+            if (!int.TryParse(args[1], out int amount) || amount <= 0) { caller.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
 
             _adminService.GiveExperience(player, amount);
-            caller?.PrintToChat($"{Prefix} Dodałeś {amount} EXP graczowi {player.Name}.");
+            caller.PrintToChat($"{Prefix} Dodałeś {amount} EXP graczowi {player.Name}.");
         }
 
-        private void OnGiveSkillPointsCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnGiveSkillPointsCommand(CCSPlayerController? caller, string[] args)
         {
-            if (caller == null || !caller.IsAdmin(_playerService)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_dskillpkt <nazwa_gracza> <ilość>"); return; }
+            if (caller == null) return;
+            if (args.Length < 2) { caller.PrintToChat($"{Prefix} Użycie: /dskillpkt <nazwa_gracza> <ilość>"); return; }
 
-            var player = _adminService.FindPlayer(info.GetArg(1));
-            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+            var player = _adminService.FindPlayer(args[0]);
+            if (player == null) { caller.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
 
-            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+            if (!int.TryParse(args[1], out int amount) || amount <= 0) { caller.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
 
             _adminService.GiveSkillPoints(player, amount);
-            caller?.PrintToChat($"{Prefix} Dodałeś {amount} punktów umiejętności graczowi {player.Name}.");
+            caller.PrintToChat($"{Prefix} Dodałeś {amount} punktów umiejętności graczowi {player.Name}.");
         }
 
-        private void OnTakeSkillPointsCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnTakeSkillPointsCommand(CCSPlayerController? caller, string[] args)
         {
-            if (caller == null || !caller.IsAdmin(_playerService)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_zskillpkt <nazwa_gracza> <ilość>"); return; }
+            if (caller == null) return;
+            if (args.Length < 2) { caller.PrintToChat($"{Prefix} Użycie: /zskillpkt <nazwa_gracza> <ilość>"); return; }
 
-            var player = _adminService.FindPlayer(info.GetArg(1));
-            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+            var player = _adminService.FindPlayer(args[0]);
+            if (player == null) { caller.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
 
-            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+            if (!int.TryParse(args[1], out int amount) || amount <= 0) { caller.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
 
             _adminService.TakeSkillPoints(player, amount);
-            caller?.PrintToChat($"{Prefix} Zabrałeś {amount} punktów umiejętności graczowi {player.Name}.");
+            caller.PrintToChat($"{Prefix} Zabrałeś {amount} punktów umiejętności graczowi {player.Name}.");
         }
 
-        private void OnGiveStatPointsCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnGiveStatPointsCommand(CCSPlayerController? caller, string[] args)
         {
-            if (caller == null || !caller.IsAdmin(_playerService)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_dstatpkt <nazwa_gracza> <ilość>"); return; }
+            if (caller == null) return;
+            if (args.Length < 2) { caller.PrintToChat($"{Prefix} Użycie: /dstatpkt <nazwa_gracza> <ilość>"); return; }
 
-            var player = _adminService.FindPlayer(info.GetArg(1));
-            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+            var player = _adminService.FindPlayer(args[0]);
+            if (player == null) { caller.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
 
-            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+            if (!int.TryParse(args[1], out int amount) || amount <= 0) { caller.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
 
             _adminService.GiveStatPoints(player, amount);
-            caller?.PrintToChat($"{Prefix} Dodałeś {amount} punktów statystyk graczowi {player.Name}.");
+            caller.PrintToChat($"{Prefix} Dodałeś {amount} punktów statystyk graczowi {player.Name}.");
         }
 
-        private void OnTakeStatPointsCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnTakeStatPointsCommand(CCSPlayerController? caller, string[] args)
         {
-            if (caller == null || !caller.IsAdmin(_playerService)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_zstatpkt <nazwa_gracza> <ilość>"); return; }
+            if (caller == null) return;
+            if (args.Length < 2) { caller.PrintToChat($"{Prefix} Użycie: /zstatpkt <nazwa_gracza> <ilość>"); return; }
 
-            var player = _adminService.FindPlayer(info.GetArg(1));
-            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+            var player = _adminService.FindPlayer(args[0]);
+            if (player == null) { caller.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
 
-            if (!int.TryParse(info.GetArg(2), out int amount) || amount <= 0) { caller?.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
+            if (!int.TryParse(args[1], out int amount) || amount <= 0) { caller.PrintToChat($"{Prefix} Nieprawidłowa ilość."); return; }
 
             _adminService.TakeStatPoints(player, amount);
-            caller?.PrintToChat($"{Prefix} Zabrałeś {amount} punktów statystyk graczowi {player.Name}.");
+            caller.PrintToChat($"{Prefix} Zabrałeś {amount} punktów statystyk graczowi {player.Name}.");
         }
 
-        private void OnResetPlayerCommand(CCSPlayerController? caller, CommandInfo info)
+        private void OnResetPlayerCommand(CCSPlayerController? caller, string[] args)
         {
-            if (caller == null || !caller.IsAdmin(_playerService)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 2) { caller?.PrintToChat($"{Prefix} Użycie: css_clearall <nazwa_gracza>"); return; }
+            if (caller == null) return;
+            if (args.Length < 1) { caller.PrintToChat($"{Prefix} Użycie: /clearall <nazwa_gracza>"); return; }
 
-            var player = _adminService.FindPlayer(info.GetArg(1));
-            if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
+            var player = _adminService.FindPlayer(args[0]);
+            if (player == null) { caller.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
 
             _adminService.ResetPlayerProgress(player);
-            caller?.PrintToChat($"{Prefix} Zresetowałeś postęp gracza {player.Name}.");
+            caller.PrintToChat($"{Prefix} Zresetowałeś postęp gracza {player.Name}.");
         }
         #endregion
 

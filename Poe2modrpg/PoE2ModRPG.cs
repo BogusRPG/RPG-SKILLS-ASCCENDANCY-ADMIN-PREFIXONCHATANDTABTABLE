@@ -116,15 +116,16 @@ namespace PoE2ModRPG
             RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
             RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
             RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
-            RegisterEventHandler<EventPlayerChat>(OnPlayerChat);
+
+            AddCommandListener("say", OnPlayerSay);
+            AddCommandListener("say_team", OnPlayerSayTeam);
         }
 
-        private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
+        private HookResult OnPlayerSay(CCSPlayerController? player, CommandInfo info)
         {
-            var player = Utilities.GetPlayerFromUserid(@event.Userid);
             if (player == null || !player.IsValid) return HookResult.Continue;
 
-            string message = @event.Text.Trim();
+            string message = info.ArgString.Trim();
             if (string.IsNullOrEmpty(message)) return HookResult.Stop;
 
             var playerData = _playerService.GetPlayer(player.SteamID);
@@ -173,16 +174,37 @@ namespace PoE2ModRPG
             string prefixRegular = $"[{rankColorRegular}{rankNameRegular}{ChatColors.Default}][LVL{playerData.Level}]";
             string formatted = $"{prefixRegular} {teamColorRegular}{player.PlayerName}{ChatColors.Default}: {message}";
 
-            if (@event.Teamonly)
+            Server.PrintToChatAll(formatted);
+
+            return HookResult.Stop;
+        }
+
+        private HookResult OnPlayerSayTeam(CCSPlayerController? player, CommandInfo info)
+        {
+            if (player == null || !player.IsValid) return HookResult.Continue;
+
+            string message = info.ArgString.Trim();
+            if (string.IsNullOrEmpty(message)) return HookResult.Stop;
+
+            if (message.StartsWith("!") || message.StartsWith("/"))
             {
-                foreach (var p in Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum && p.IsValid))
-                {
-                    p.PrintToChat(formatted);
-                }
+                string command = message.Substring(1);
+                player.ExecuteClientCommand(command);
+                return HookResult.Stop;
             }
-            else
+
+            var playerData = _playerService.GetPlayer(player.SteamID);
+            if (playerData == null) return HookResult.Stop;
+
+            string rankNameRegular = _rankService.GetRankName(playerData.Rank.RankValue);
+            string rankColorRegular = _rankService.GetRankColor(playerData.Rank.RankValue);
+            string teamColorRegular = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
+            string prefixRegular = $"[{rankColorRegular}{rankNameRegular}{ChatColors.Default}][LVL{playerData.Level}]";
+            string formatted = $"{prefixRegular} {teamColorRegular}{player.PlayerName}{ChatColors.Default}: {message}";
+
+            foreach (var p in Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum && p.IsValid))
             {
-                Server.PrintToChatAll(formatted);
+                p.PrintToChat(formatted);
             }
 
             return HookResult.Stop;

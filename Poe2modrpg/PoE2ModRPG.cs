@@ -159,7 +159,7 @@ namespace PoE2ModRPG
             }
 
             // --- Commands ---
-            if (message.StartsWith("!"))
+            if (message.StartsWith("!") || message.StartsWith("/"))
             {
                 string command = message.Substring(1);
                 player.ExecuteClientCommand(command);

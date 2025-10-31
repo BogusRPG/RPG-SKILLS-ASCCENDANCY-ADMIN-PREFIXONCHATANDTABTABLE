@@ -16,6 +16,7 @@ using PoE2ModRPG.Services;
 using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 using MySqlConnector;
 using System.Linq;
+using System.Reflection;
 using PoE2ModRPG.Utils;
 
 namespace PoE2ModRPG
@@ -538,6 +539,11 @@ namespace PoE2ModRPG
                 playerData.Mana = playerData.MaxMana;
 
                 UpdatePlayerPrefix(player);
+
+                string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
+                string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
+                string chatTag = $"[{rankName}][LVL{playerData.Level}]";
+                SetPlayerChatTag(player, chatTag, rankColor);
             });
             return HookResult.Continue;
         }
@@ -674,6 +680,48 @@ namespace PoE2ModRPG
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
 
             Server.ExecuteCommand($"sv_setsteamaccount {player.SteamID} \"{prefix}\"");
+        }
+
+        private void SetPlayerChatTag(CCSPlayerController player, string tag, string chatColor)
+        {
+            try
+            {
+                var chatManagerAssembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "ChatManager");
+                if (chatManagerAssembly == null) return;
+
+                var chatManagerType = chatManagerAssembly.GetType("ChatManager.ChatManager");
+                if (chatManagerType == null) return;
+
+                var instanceProp = chatManagerType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static);
+                if (instanceProp == null) return;
+                var chatManagerInstance = instanceProp.GetValue(null);
+                if (chatManagerInstance == null) return;
+
+                var configProp = chatManagerType.GetProperty("Config");
+                if (configProp == null) return;
+                var chatManagerConfig = configProp.GetValue(chatManagerInstance);
+
+                var tagsProp = chatManagerConfig?.GetType().GetProperty("Tags");
+                if (tagsProp == null) return;
+
+                dynamic tags = tagsProp.GetValue(chatManagerConfig);
+                if (tags == null) return;
+
+                var tagType = chatManagerAssembly.GetType("ChatManager.Tag");
+                if (tagType == null) return;
+
+                var newTag = Activator.CreateInstance(tagType);
+                tagType.GetProperty("ChatTag")?.SetValue(newTag, tag);
+                tagType.GetProperty("NameColor")?.SetValue(newTag, "{White}");
+                tagType.GetProperty("ChatColor")?.SetValue(newTag, chatColor);
+
+                var setItemMethod = tags.GetType().GetMethod("set_Item");
+                setItemMethod?.Invoke(tags, new object[] { player.SteamID.ToString(), newTag });
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"[RPGPlugin] An error occurred during SetPlayerChatTag: {e.Message}");
+            }
         }
         #endregion
 

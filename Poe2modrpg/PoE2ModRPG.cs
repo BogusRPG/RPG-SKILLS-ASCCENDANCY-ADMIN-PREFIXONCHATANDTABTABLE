@@ -64,6 +64,7 @@ namespace PoE2ModRPG
                 _skillManager.RegisterSkill(new Services.Skills.HealSkill());
                 _skillManager.RegisterSkill(new Services.Skills.SpeedBoostSkill());
                 _skillManager.RegisterSkill(new Services.Skills.VampirismSkill());
+                _skillManager.RegisterSkill(new Services.Skills.WallhackSkill());
                 _cooldownManager = new CooldownManager();
                 _adminService = new AdminService(_playerService, _levelingService, _dbManager);
                 _rankService = new RankService(_dbManager);
@@ -118,6 +119,21 @@ namespace PoE2ModRPG
 
             AddCommandListener("say", OnPlayerSay);
             AddCommandListener("say_team", OnPlayerSayTeam);
+        }
+
+        public override void Unload(bool hotReload)
+        {
+            Services.Skills.WallhackSkill.Cleanup();
+        }
+
+        public PoE2ModRPG()
+        {
+            var worldspawn = Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("worldspawn").First();
+            worldspawn.HookEntityOutput("OnCheckTransmit", (CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay) =>
+            {
+                var infoList = value.Retrieve<CCheckTransmitInfoList>();
+                Services.Skills.WallhackSkill.CheckTransmit(infoList);
+            });
         }
 
         private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
@@ -415,6 +431,10 @@ namespace PoE2ModRPG
             }
 
             var skillName = info.GetArg(1);
+            if (skillName.Equals("wh", StringComparison.OrdinalIgnoreCase))
+            {
+                skillName = "Wallhack";
+            }
             var playerData = _playerService.GetPlayer(caller.SteamID);
             if (playerData == null) return;
 
@@ -456,6 +476,7 @@ namespace PoE2ModRPG
         #region Other Logic
         private HookResult OnPlayerSpawn(EventPlayerSpawn ev, GameEventInfo info)
         {
+            Services.Skills.WallhackSkill.Cleanup();
             var player = ev.Userid;
             if (player == null || !player.IsValid || player.IsBot) return HookResult.Continue;
 

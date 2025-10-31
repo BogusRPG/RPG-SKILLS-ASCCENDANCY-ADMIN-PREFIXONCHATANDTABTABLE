@@ -76,21 +76,21 @@ namespace PoE2ModRPG
                 throw;
             }
 
-            AddCommand("css_staty", "Pokazuje statystyki", OnStatsCommand);
-            AddCommand("css_str", "Dodaje punkty do Siły", OnStrCommand);
-            AddCommand("css_int", "Dodaje punkty do Inteligencji", OnIntCommand);
-            AddCommand("css_dex", "Dodaje punkty do Zręczności", OnDexCommand);
-            AddCommand("css_reset", "Resetuje statystyki", OnResetCommand);
+            AddCommand("css_staty", "Pokazuje statystyki", (p, info) => OnStatsCommand(p, Array.Empty<string>()));
+            AddCommand("css_str", "Dodaje punkty do Siły", (p, info) => OnStrCommand(p, new[] { info.ArgString }));
+            AddCommand("css_int", "Dodaje punkty do Inteligencji", (p, info) => OnIntCommand(p, new[] { info.ArgString }));
+            AddCommand("css_dex", "Dodaje punkty do Zręczności", (p, info) => OnDexCommand(p, new[] { info.ArgString }));
+            AddCommand("css_reset", "Resetuje statystyki", (p, info) => OnResetCommand(p, Array.Empty<string>()));
             AddCommand("css_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
-            AddCommand("css_skills", "Shows available skills", OnSkillsCommand);
-            AddCommand("css_learn", "Learn a skill", OnLearnCommand);
-            AddCommand("css_cast", "Casts a skill", OnCastCommand);
-            AddCommand("css_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
-            AddCommand("css_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
-            AddCommand("css_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
-            AddCommand("css_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
-            AddCommand("css_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
-            AddCommand("css_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
+            AddCommand("css_skills", "Shows available skills", (p, info) => OnSkillsCommand(p, Array.Empty<string>()));
+            AddCommand("css_learn", "Learn a skill", (p, info) => OnLearnCommand(p, new[] { info.ArgString }));
+            AddCommand("css_cast", "Casts a skill", (p, info) => OnCastCommand(p, new[] { info.ArgString }));
+            AddCommand("css_dxp", "Daje graczowi punkty doświadczenia", (p, info) => OnGiveExpCommand(p, info.ArgString.Split(' ')));
+            AddCommand("css_dskillpkt", "Daje graczowi punkty umiejętności", (p, info) => OnGiveSkillPointsCommand(p, info.ArgString.Split(' ')));
+            AddCommand("css_zskillpkt", "Zabiera graczowi punkty umiejętności", (p, info) => OnTakeSkillPointsCommand(p, info.ArgString.Split(' ')));
+            AddCommand("css_dstatpkt", "Daje graczowi punkty statystyk", (p, info) => OnGiveStatPointsCommand(p, info.ArgString.Split(' ')));
+            AddCommand("css_zstatpkt", "Zabiera graczowi punkty statystyk", (p, info) => OnTakeStatPointsCommand(p, info.ArgString.Split(' ')));
+            AddCommand("css_clearall", "Resetuje cały postęp gracza", (p, info) => OnResetPlayerCommand(p, new[] { info.ArgString }));
 
             RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
             RegisterEventHandler<EventBombPlanted>(OnBombPlanted);
@@ -106,10 +106,10 @@ namespace PoE2ModRPG
 
         private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
         {
-            var player = @event.Userid;
+            var player = Utilities.GetPlayerFromUserid(@event.Userid);
             var message = @event.Text;
 
-            if (player == null || !player.IsValid || string.IsNullOrWhiteSpace(message))
+            if (player == null || !player.IsValid || player.IsBot || string.IsNullOrWhiteSpace(message))
             {
                 return HookResult.Stop;
             }
@@ -176,64 +176,7 @@ namespace PoE2ModRPG
                 return HookResult.Stop;
             }
 
-            var playerData = _playerService.GetPlayer(player.SteamID);
-            if (playerData == null) return HookResult.Stop;
-
-            // --- Admin Chat ---
-            if (message.StartsWith("@"))
-            {
-                if (playerData.Rank.RankValue >= 1) // Admin or higher
-                {
-                    var adminMessage = message.Substring(1);
-                    if (string.IsNullOrWhiteSpace(adminMessage)) return HookResult.Stop;
-
-                    string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
-                    string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
-                    string teamColor = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
-                    string prefix = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
-
-                    var chatMessage = $"{ChatColors.LightRed}[CZAT ADMIN]{ChatColors.Default} {prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.Grey}{adminMessage}{ChatColors.Default}";
-
-                    var admins = Utilities.GetPlayers().Where(p => _playerService.GetPlayer(p.SteamID)?.Rank.RankValue >= 1);
-                    foreach (var admin in admins)
-                    {
-                        admin.PrintToChat(chatMessage);
-                    }
-                }
-                else
-                {
-                    player.PrintToChat($"{Prefix} {ChatColors.Red}Nie masz uprawnień do pisania na czacie admina.");
-                }
-                return HookResult.Stop;
-            }
-
-            // --- Team Chat ---
-            if (@event.Teamonly)
-            {
-                string teamPrefix = $"{ChatColors.Blue}[TEAM]{ChatColors.Default}";
-                string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
-                string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
-                string teamColor = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
-                string playerPrefix = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
-                string formatted = $"{teamPrefix} {playerPrefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {message}";
-
-                foreach (var p in Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum && p.IsValid))
-                {
-                    p.PrintToChat(formatted);
-                }
-                return HookResult.Stop;
-            }
-
-            // --- Regular Chat ---
-            string rankNameRegular = _rankService.GetRankName(playerData.Rank.RankValue);
-            string rankColorRegular = _rankService.GetRankColor(playerData.Rank.RankValue);
-            string teamColorRegular = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
-            string prefixRegular = $"[{rankColorRegular}{rankNameRegular}{ChatColors.Default}][LVL{playerData.Level}]";
-            string formattedMessage = $"{prefixRegular} {teamColorRegular}{player.PlayerName}{ChatColors.Default}: {message}";
-
-            Server.PrintToChatAll(formattedMessage);
-
-            return HookResult.Stop;
+            return HookResult.Continue;
         }
 
         private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)

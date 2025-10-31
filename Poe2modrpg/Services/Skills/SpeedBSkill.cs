@@ -3,9 +3,9 @@ using PoE2ModRPG.Models;
 
 namespace PoE2ModRPG.Services.Skills
 {
-    public class SpeedBoostSkill : Skill
+    public class SpeedBSkill : Skill
     {
-        public override string Name => "Speed Boost";
+        public override string Name => "SpeedB";
         public override string Description => "Tymczasowo zwiększa prędkość poruszania się.";
         public override int MaxLevel => 5;
 
@@ -26,14 +26,13 @@ namespace PoE2ModRPG.Services.Skills
             var pawn = controller.PlayerPawn.Value;
             if (pawn == null) return;
 
-            float originalSpeed = pawn.Speed;
-            pawn.Speed *= _speedMultipliers[level - 1];
+            pawn.VelocityModifier = _speedMultipliers[level - 1];
 
             plugin.AddTimer(_durations[level - 1], () =>
             {
                 if (pawn.IsValid)
                 {
-                    pawn.Speed = originalSpeed;
+                    pawn.VelocityModifier = 1.0f;
                 }
             });
         }

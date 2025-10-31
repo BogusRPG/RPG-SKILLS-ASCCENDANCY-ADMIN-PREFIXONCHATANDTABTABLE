@@ -33,7 +33,7 @@ namespace PoE2ModRPG
         private readonly List<Services.Skills.ActiveVampirismEffect> _activeVampirismEffects = new();
         private readonly List<string> _pluginCommands = new List<string>
         {
-            "staty", "str", "int", "dex", "reset", "dbtest", "skills", "learn", "cast",
+            "staty", "str", "int", "dex", "reset", "dbtest", "skills", "learn", "cast", "komendy",
             "dxp", "dskillpkt", "zskillpkt", "dstatpkt", "zstatpkt", "clearall"
         };
 
@@ -68,7 +68,7 @@ namespace PoE2ModRPG
                 _levelingService = new LevelingService(this, _playerService, _dbManager);
                 _skillManager = new SkillManager();
                 _skillManager.RegisterSkill(new Services.Skills.HealSkill());
-                _skillManager.RegisterSkill(new Services.Skills.SpeedBoostSkill());
+                _skillManager.RegisterSkill(new Services.Skills.SpeedBSkill());
                 _skillManager.RegisterSkill(new Services.Skills.VampirismSkill());
                 _cooldownManager = new CooldownManager();
                 _adminService = new AdminService(_playerService, _levelingService, _dbManager);
@@ -90,6 +90,7 @@ namespace PoE2ModRPG
             AddCommand("css_skills", "Shows available skills", OnSkillsCommand);
             AddCommand("css_learn", "Learn a skill", OnLearnCommand);
             AddCommand("css_cast", "Casts a skill", OnCastCommand);
+            AddCommand("css_komendy", "Pokazuje listę dostępnych komend", OnCommandsCommand);
             AddCommand("css_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
             AddCommand("css_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
             AddCommand("css_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
@@ -395,6 +396,21 @@ namespace PoE2ModRPG
             _dbManager.SavePlayer(playerData);
         }
 
+        private void OnCommandsCommand(CCSPlayerController? caller, CommandInfo info)
+        {
+            if (caller == null) return;
+
+            caller.PrintToChat($"{Prefix} Dostępne komendy:");
+            caller.PrintToChat($" {ChatColors.LightRed}/staty{ChatColors.Default} - Wyświetla twoje statystyki.");
+            caller.PrintToChat($" {ChatColors.LightRed}/str [ilość]{ChatColors.Default} - Dodaje punkty siły.");
+            caller.PrintToChat($" {ChatColors.LightRed}/int [ilość]{ChatColors.Default} - Dodaje punkty inteligencji.");
+            caller.PrintToChat($" {ChatColors.LightRed}/dex [ilość]{ChatColors.Default} - Dodaje punkty zręczności.");
+            caller.PrintToChat($" {ChatColors.LightRed}/reset{ChatColors.Default} - Resetuje statystyki, zwracając punkty.");
+            caller.PrintToChat($" {ChatColors.LightRed}/skills{ChatColors.Default} - Pokazuje dostępne umiejętności.");
+            caller.PrintToChat($" {ChatColors.LightRed}/learn <nazwa>{ChatColors.Default} - Uczy się lub ulepsza umiejętność.");
+            caller.PrintToChat($" {ChatColors.LightRed}/cast <nazwa>{ChatColors.Default} - Używa umiejętności aktywnej.");
+        }
+
         private void OnCastCommand(CCSPlayerController? caller, CommandInfo info)
         {
             if (caller == null || info.ArgCount < 2)
@@ -404,6 +420,10 @@ namespace PoE2ModRPG
             }
 
             var skillName = info.GetArg(1);
+            if (skillName.Equals("speed", StringComparison.OrdinalIgnoreCase))
+            {
+                skillName = "SpeedB";
+            }
             var playerData = _playerService.GetPlayer(caller.SteamID);
             if (playerData == null) return;
 
@@ -584,7 +604,7 @@ namespace PoE2ModRPG
             var text = @event.Text.Trim();
             if (string.IsNullOrWhiteSpace(text)) return HookResult.Continue;
 
-            if (text.StartsWith("!") || text.StartsWith("/"))
+            if (text.StartsWith("!"))
             {
                 var commandText = text.Substring(1);
                 var commandParts = commandText.Split(' ');
@@ -597,6 +617,7 @@ namespace PoE2ModRPG
                 }
             }
 
+            // Let ChatManager and the framework handle '/' commands and regular messages.
             return HookResult.Continue;
         }
         #endregion

@@ -1,11 +1,10 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Entities;
-using CounterStrikeSharp.API.Modules.Utils;
 using PoE2ModRPG.Models;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 
 namespace PoE2ModRPG.Services.Skills
 {
@@ -13,126 +12,115 @@ namespace PoE2ModRPG.Services.Skills
     {
         public override string Name => "Wallhack";
         public override string Description => "Pozwala widzieć przeciwników przez ściany.";
-        public override int MaxLevel => 3;
-
-        private readonly int[] _durations = { 5, 7, 10 };
-        private readonly int[] _manaCosts = { 40, 50, 60 };
-
+        public override bool IsPassive => false;
         public override int Cooldown => 60;
-        public override int RequiredInt => 25;
-        public override int RequiredLevel => 15;
+        public override int RequiredLevel => 10;
+        public override int MaxLevel => 5;
 
-        public static readonly ConcurrentDictionary<ulong, byte> PlayersInAction = new();
-        public static readonly ConcurrentBag<(CDynamicProp, CDynamicProp, CsTeam)> Glows = new();
+        private static readonly Dictionary<ulong, List<CBaseEntity>> _playerGlowEntities = new();
+        private static readonly Dictionary<ulong, Timer> _actionTimers = new();
 
-        public override int GetManaCost(int level) => _manaCosts[level - 1];
+        public override int GetManaCost(int level) => 50 + (level - 1) * 10;
 
-        public override void OnLearn(Models.Player player, int level) { }
-
-        public override void OnActivate(PoE2ModRPG plugin, CCSPlayerController controller, Models.Player player, int level)
+        public override void OnLearn(Player player, int level)
         {
-            PlayersInAction.TryAdd(controller.SteamID, 0);
-            if (Glows.IsEmpty)
-            {
-                SetGlowEffectForAll(controller);
-            }
-
-            plugin.AddTimer(_durations[level - 1], () => OnDeactivate(controller));
+            // This skill has no passive effect on learn, so this is empty.
         }
 
-        private void OnDeactivate(CCSPlayerController controller)
+        public override void OnActivate(PoE2ModRPG plugin, CCSPlayerController player, Player playerData, int skillLevel)
         {
-            PlayersInAction.TryRemove(controller.SteamID, out _);
-            if (PlayersInAction.IsEmpty)
+            if (player == null || !player.IsValid || !player.Pawn.IsValid) return;
+
+            CleanupPlayer(player.SteamID);
+
+            var glowEntities = new List<CBaseEntity>();
+            _playerGlowEntities[player.SteamID] = glowEntities;
+
+            foreach (var p in Utilities.GetPlayers())
             {
-                Cleanup();
+                if (p == null || !p.IsValid || !p.Pawn.IsValid || p.TeamNum == player.TeamNum || p.IsBot || p.SteamID == player.SteamID) continue;
+
+                var pawn = p.Pawn.Value;
+                if (pawn == null) continue;
+
+                var glowEntity = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic");
+                if (glowEntity == null) continue;
+
+                glowEntity.SetModel(pawn.CBodyComponent!.SceneNode!.GetSkeletonInstance().ModelState.ModelName);
+                glowEntity.DispatchSpawn();
+
+                glowEntity.AcceptInput("FollowEntity", pawn, glowEntity, "!activator");
+
+                glowEntity.RenderMode = RenderMode_t.kRenderGlow;
+                glowEntity.Render = Color.FromArgb(255, 0, 0);
+                glowEntity.Glow.GlowColorOverride = Color.FromArgb(255, 0, 0, 150);
+                glowEntity.Glow.GlowRange = 10000;
+
+                glowEntities.Add(glowEntity);
             }
+
+            var duration = 5.0f + skillLevel;
+            _actionTimers[player.SteamID] = plugin.AddTimer(duration, () => CleanupPlayer(player.SteamID));
         }
 
-        public static void Cleanup()
+        public static void OnCheckTransmit(CCheckTransmitInfoList infoList)
         {
-            foreach (var glow in Glows)
+            var allGlowEntities = _playerGlowEntities.Values.SelectMany(list => list).ToList();
+            if (allGlowEntities.Count == 0) return;
+
+            foreach ((CCheckTransmitInfo info, CCSPlayerController? player) in infoList)
             {
-                if (glow.Item1 != null && glow.Item1.IsValid) glow.Item1.Remove();
-                if (glow.Item2 != null && glow.Item2.IsValid) glow.Item2.Remove();
-            }
-            Glows.Clear();
-            PlayersInAction.Clear();
-        }
+                if (player == null || !player.IsValid) continue;
 
-        public static bool IsPlayerUsing(ulong steamId) => PlayersInAction.ContainsKey(steamId);
-
-        private void SetGlowEffectForAll(CCSPlayerController activator)
-        {
-            foreach (var enemy in Utilities.GetPlayers().Where(p => p.IsValid && p.PawnIsAlive && p.TeamNum != activator.TeamNum))
-            {
-                var enemyPawn = enemy.PlayerPawn.Value;
-                if (enemyPawn == null) continue;
-
-                var modelRelay = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic");
-                var modelGlow = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic");
-
-                if (modelRelay == null || modelGlow == null) return;
-
-                modelRelay.SetModel(enemyPawn.CBodyComponent!.SceneNode!.GetSkeletonInstance().ModelState.ModelName);
-                modelRelay.Spawnflags = 256u;
-                modelRelay.RenderMode = RenderMode_t.kRenderNone;
-                modelRelay.DispatchSpawn();
-
-                modelGlow.SetModel(enemyPawn.CBodyComponent!.SceneNode!.GetSkeletonInstance().ModelState.ModelName);
-                modelGlow.Spawnflags = 256u;
-                modelGlow.Render = Color.FromArgb(1, 255, 255, 255);
-                modelGlow.DispatchSpawn();
-
-                modelGlow.Glow.GlowColorOverride = enemy.TeamNum == (byte)CsTeam.Terrorist ? Color.FromArgb(255, 255, 165, 0) : Color.FromArgb(255, 173, 216, 230);
-                modelGlow.Glow.GlowRange = 5000;
-                modelGlow.Glow.GlowTeam = -1;
-                modelGlow.Glow.GlowType = 3;
-                modelGlow.Glow.GlowRangeMin = 100;
-
-                modelRelay.AcceptInput("FollowEntity", enemyPawn, modelRelay, "!activator", 0);
-                modelGlow.AcceptInput("FollowEntity", modelRelay, modelGlow, "!activator", 0);
-
-                Glows.Add((modelRelay, modelGlow, (CsTeam)enemy.TeamNum));
-            }
-        }
-
-        public static void CheckTransmit(CCheckTransmitInfoList infoList)
-        {
-            if (Glows.IsEmpty) return;
-
-            foreach (var (info, player) in infoList)
-            {
-                if (player == null) continue;
-
-                var observerTarget = player.Pawn?.Value?.ObserverServices?.ObserverTarget?.Value;
-                CCSPlayerController? observedPlayer = null;
-                if (observerTarget != null)
+                List<CBaseEntity>? myGlowEntities = null;
+                if (_playerGlowEntities.TryGetValue(player.SteamID, out myGlowEntities))
                 {
-                    foreach (var p in Utilities.GetPlayers())
+                    // This player has WH active. They should see their props, but not others.
+                }
+
+                foreach (var glowEntity in allGlowEntities)
+                {
+                    if (glowEntity.IsValid)
                     {
-                        if (p.PlayerPawn.Value?.Handle == observerTarget.Handle)
+                        if (myGlowEntities != null && myGlowEntities.Contains(glowEntity))
                         {
-                            observedPlayer = p;
-                            break;
+                            // This is one of my props, so let it transmit.
+                            continue;
                         }
+                        // This is a glow prop, but it's for someone else, so hide it.
+                        info.TransmitEntities.Remove(glowEntity.Index);
                     }
                 }
+            }
+        }
 
-                bool shouldSeeGlow = IsPlayerUsing(player.SteamID) || (observedPlayer != null && IsPlayerUsing(observedPlayer.SteamID));
+        public static void CleanupPlayer(ulong steamId)
+        {
+            if (_actionTimers.TryGetValue(steamId, out var timer))
+            {
+                timer.Kill();
+                _actionTimers.Remove(steamId);
+            }
 
-                foreach (var glow in Glows)
+            if (_playerGlowEntities.TryGetValue(steamId, out var entities))
+            {
+                foreach (var entity in entities)
                 {
-                    bool isEnemyGlow = glow.Item3 != (CsTeam)player.TeamNum;
-
-                    if (shouldSeeGlow && isEnemyGlow)
+                    if (entity != null && entity.IsValid)
                     {
-                        continue;
+                        entity.Remove();
                     }
-
-                    info.TransmitEntities.Remove(glow.Item1.Index);
-                    info.TransmitEntities.Remove(glow.Item2.Index);
                 }
+                _playerGlowEntities.Remove(steamId);
+            }
+        }
+
+        public static void CleanupAll()
+        {
+            var playerIds = new List<ulong>(_playerGlowEntities.Keys);
+            foreach (var steamId in playerIds)
+            {
+                CleanupPlayer(steamId);
             }
         }
     }

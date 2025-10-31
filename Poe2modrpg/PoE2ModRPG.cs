@@ -76,37 +76,37 @@ namespace PoE2ModRPG
                 throw;
             }
 
-            AddCommand("staty", "Pokazuje statystyki", OnStatsCommand);
-            AddCommand("poe_staty", "Pokazuje statystyki", OnStatsCommand);
-            AddCommand("str", "Dodaje punkty do Siły", OnStrCommand);
-            AddCommand("poe_str", "Dodaje punkty do Siły", OnStrCommand);
-            AddCommand("int", "Dodaje punkty do Inteligencji", OnIntCommand);
-            AddCommand("poe_int", "Dodaje punkty do Inteligencji", OnIntCommand);
-            AddCommand("dex", "Dodaje punkty do Zręczności", OnDexCommand);
-            AddCommand("poe_dex", "Dodaje punkty do Zręczności", OnDexCommand);
-            AddCommand("reset", "Resetuje statystyki", OnResetCommand);
-            AddCommand("poe_reset", "Resetuje statystyki", OnResetCommand);
-            AddCommand("dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
-            AddCommand("poe_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
-            AddCommand("skills", "Shows available skills", OnSkillsCommand);
-            AddCommand("poe_skills", "Shows available skills", OnSkillsCommand);
-            AddCommand("learn", "Learn a skill", OnLearnCommand);
-            AddCommand("poe_learn", "Learn a skill", OnLearnCommand);
-            AddCommand("cast", "Casts a skill", OnCastCommand);
-            AddCommand("poe_cast", "Casts a skill", OnCastCommand);
+            AddCommand("css_staty", "Pokazuje statystyki", OnStatsCommand);
+            AddCommand("css_poe_staty", "Pokazuje statystyki", OnStatsCommand);
+            AddCommand("css_str", "Dodaje punkty do Siły", OnStrCommand);
+            AddCommand("css_poe_str", "Dodaje punkty do Siły", OnStrCommand);
+            AddCommand("css_int", "Dodaje punkty do Inteligencji", OnIntCommand);
+            AddCommand("css_poe_int", "Dodaje punkty do Inteligencji", OnIntCommand);
+            AddCommand("css_dex", "Dodaje punkty do Zręczności", OnDexCommand);
+            AddCommand("css_poe_dex", "Dodaje punkty do Zręczności", OnDexCommand);
+            AddCommand("css_reset", "Resetuje statystyki", OnResetCommand);
+            AddCommand("css_poe_reset", "Resetuje statystyki", OnResetCommand);
+            AddCommand("css_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
+            AddCommand("css_poe_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
+            AddCommand("css_skills", "Shows available skills", OnSkillsCommand);
+            AddCommand("css_poe_skills", "Shows available skills", OnSkillsCommand);
+            AddCommand("css_learn", "Learn a skill", OnLearnCommand);
+            AddCommand("css_poe_learn", "Learn a skill", OnLearnCommand);
+            AddCommand("css_cast", "Casts a skill", OnCastCommand);
+            AddCommand("css_poe_cast", "Casts a skill", OnCastCommand);
 
-            AddCommand("dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
-            AddCommand("poe_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
-            AddCommand("dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
-            AddCommand("poe_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
-            AddCommand("zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
-            AddCommand("poe_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
-            AddCommand("dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
-            AddCommand("poe_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
-            AddCommand("zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
-            AddCommand("poe_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
-            AddCommand("clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
-            AddCommand("poe_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
+            AddCommand("css_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
+            AddCommand("css_poe_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
+            AddCommand("css_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
+            AddCommand("css_poe_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
+            AddCommand("css_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
+            AddCommand("css_poe_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
+            AddCommand("css_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
+            AddCommand("css_poe_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
+            AddCommand("css_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
+            AddCommand("css_poe_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
+            AddCommand("css_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
+            AddCommand("css_poe_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
 
             RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
             RegisterEventHandler<EventBombPlanted>(OnBombPlanted);
@@ -121,21 +121,18 @@ namespace PoE2ModRPG
             AddCommandListener("say", OnPlayerSay);
             AddCommandListener("say_team", OnPlayerSayTeam);
 
-            RegisterListener<Listeners.CheckTransmit>((infoList) =>
-            {
-                Services.Skills.WallhackSkill.CheckTransmit(infoList);
-            });
-        }
-
-        private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
-        {
-            Services.Skills.WallhackSkill.Cleanup();
-            return HookResult.Continue;
+            RegisterListener<Listeners.CheckTransmit>(Services.Skills.WallhackSkill.OnCheckTransmit);
         }
 
         public override void Unload(bool hotReload)
         {
-            Services.Skills.WallhackSkill.Cleanup();
+            Services.Skills.WallhackSkill.CleanupAll();
+        }
+
+        private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
+        {
+            Services.Skills.WallhackSkill.CleanupAll();
+            return HookResult.Continue;
         }
 
         private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
@@ -636,7 +633,7 @@ namespace PoE2ModRPG
             if (text.StartsWith("!") || text.StartsWith("/"))
             {
                 var command = text.Substring(1);
-                player.ExecuteClientCommand(command);
+                player.ExecuteClientCommand($"css_{command}");
                 return;
             }
 

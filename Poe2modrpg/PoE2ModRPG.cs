@@ -54,11 +54,17 @@ namespace PoE2ModRPG
         {
             Instance = this;
 
-            AddRawEntityOutputHook("worldspawn", "OnCheckTransmit", (CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay) =>
+            AddTimer(1.0f, () =>
             {
-                var infoList = value.Retrieve<CCheckTransmitInfoList>();
-                Services.Skills.WallhackSkill.CheckTransmit(infoList);
-                return HookResult.Continue;
+                var worldspawn = Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("worldspawn").FirstOrDefault();
+                if (worldspawn != null)
+                {
+                    worldspawn.HookEntityOutput("OnCheckTransmit", (CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay) =>
+                    {
+                        var infoList = value.Retrieve<CCheckTransmitInfoList>();
+                        Services.Skills.WallhackSkill.CheckTransmit(infoList);
+                    });
+                }
             });
 
             try

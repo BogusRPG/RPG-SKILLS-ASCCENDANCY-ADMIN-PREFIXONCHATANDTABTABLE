@@ -16,6 +16,7 @@ using PoE2ModRPG.Services;
 using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 using MySqlConnector;
 using System.Linq;
+using System.Collections.Concurrent;
 
 namespace PoE2ModRPG
 {
@@ -30,6 +31,8 @@ namespace PoE2ModRPG
         private static readonly string Prefix = $" {ChatColors.Gold}[PoE2Mod]{ChatColors.Default}";
         private readonly Dictionary<ulong, Timer> _manaRegenTimers = new();
         private readonly List<Services.Skills.ActiveVampirismEffect> _activeVampirismEffects = new();
+        private readonly ConcurrentDictionary<ulong, Timer> _wallhackTimers = new();
+        private readonly ConcurrentBag<CHandle<CDynamicProp>> _glowEntities = new();
 
         private DatabaseManager _dbManager = null!;
         private PlayerService _playerService = null!;
@@ -62,8 +65,9 @@ namespace PoE2ModRPG
                 _levelingService = new LevelingService(this, _playerService, _dbManager);
                 _skillManager = new SkillManager();
                 _skillManager.RegisterSkill(new Services.Skills.HealSkill());
-                _skillManager.RegisterSkill(new Services.Skills.SpeedBoostSkill());
+                _skillManager.RegisterSkill(new Services.Skills.SpeedBSkill());
                 _skillManager.RegisterSkill(new Services.Skills.VampirismSkill());
+                _skillManager.RegisterSkill(new Services.Skills.WallhackSkill());
                 _cooldownManager = new CooldownManager();
                 _adminService = new AdminService(_playerService, _levelingService, _dbManager);
                 _rankService = new RankService(_dbManager);
@@ -111,6 +115,7 @@ namespace PoE2ModRPG
             RegisterEventHandler<EventBombPlanted>(OnBombPlanted);
             RegisterEventHandler<EventBombDefused>(OnBombDefused);
             RegisterEventHandler<EventRoundEnd>(OnRoundEnd);
+            RegisterEventHandler<EventRoundStart>(OnRoundStart);
             RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
             RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
             RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
@@ -232,6 +237,12 @@ namespace PoE2ModRPG
                     }
                 }
             }
+            return HookResult.Continue;
+        }
+
+        private HookResult OnRoundStart(EventRoundStart ev, GameEventInfo info)
+        {
+            CleanupWallhack();
             return HookResult.Continue;
         }
         #endregion
@@ -696,6 +707,108 @@ namespace PoE2ModRPG
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
 
             Server.ExecuteCommand($"sv_setsteamaccount {player.SteamID} \"{prefix}\"");
+        }
+        #endregion
+
+        #region Wallhack Logic
+        public void ActivateWallhack(ulong steamId)
+        {
+            if (_wallhackTimers.ContainsKey(steamId)) return;
+
+            var timer = AddTimer(10.0f, () =>
+            {
+                if (_wallhackTimers.TryRemove(steamId, out var removedTimer))
+                {
+                    removedTimer.Kill();
+                    if (_wallhackTimers.IsEmpty)
+                    {
+                        CleanupWallhack();
+                    }
+                }
+            });
+
+            _wallhackTimers.TryAdd(steamId, timer);
+
+            if (_wallhackTimers.Count == 1)
+            {
+                RegisterListener<Listeners.OnCheckTransmit>(OnCheckTransmit);
+            }
+            ApplyGlowsToPlayers();
+        }
+
+        private void ApplyGlowsToPlayers()
+        {
+            CleanupGlowEntities();
+            foreach (var p in Utilities.GetPlayers())
+            {
+                if (p == null || !p.IsValid || !p.PawnIsAlive || p.IsBot) continue;
+
+                var pawn = p.PlayerPawn.Value;
+                if (pawn == null) continue;
+
+                var modelGlow = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic");
+                if (modelGlow == null) continue;
+
+                modelGlow.SetModel(pawn.CBodyComponent!.SceneNode!.GetSkeletonInstance().ModelState.ModelName);
+                modelGlow.DispatchSpawn();
+                modelGlow.Teleport(pawn.AbsOrigin, pawn.AbsRotation, pawn.AbsVelocity);
+
+                modelGlow.Glow.GlowColorOverride = p.Team == CsTeam.Terrorist ? System.Drawing.Color.FromArgb(255, 255, 165, 0) : System.Drawing.Color.FromArgb(255, 173, 216, 230);
+                modelGlow.Glow.GlowRange = 5000;
+                modelGlow.Glow.GlowTeam = (int)p.Team;
+                modelGlow.Glow.GlowType = 3;
+                modelGlow.Glow.GlowRangeMin = 100;
+
+                _glowEntities.Add(new CHandle<CDynamicProp>(modelGlow.Index, modelGlow.SerialNumber));
+            }
+        }
+
+        private void OnCheckTransmit(CCheckTransmitInfoList infoList)
+        {
+            foreach (var info in infoList.Infos)
+            {
+                var player = info.Player;
+                if (player == null) continue;
+
+                var observedPlayer = Utilities.GetPlayers().FirstOrDefault(p => p?.Pawn?.Value?.ObserverServices?.ObserverTarget?.Value?.Handle == player.Pawn?.Value?.Handle);
+
+                bool shouldSeeGlow = _wallhackTimers.ContainsKey(player.SteamID) || (observedPlayer != null && _wallhackTimers.ContainsKey(observedPlayer.SteamID));
+
+                if (!shouldSeeGlow)
+                {
+                    foreach (var glowEntity in _glowEntities)
+                    {
+                        if (glowEntity.Value != null)
+                            info.TransmitEntities.Remove(glowEntity.Value.Index);
+                    }
+                }
+            }
+        }
+
+        private void CleanupGlowEntities()
+        {
+            foreach (var entity in _glowEntities)
+            {
+                if (entity.Value != null)
+                {
+                    entity.Value.Remove();
+                }
+            }
+            _glowEntities.Clear();
+        }
+
+        private void CleanupWallhack()
+        {
+            if (_wallhackTimers.IsEmpty) return;
+
+            DeregisterListener<Listeners.OnCheckTransmit>(OnCheckTransmit);
+
+            foreach(var timer in _wallhackTimers.Values)
+            {
+                timer.Kill();
+            }
+            _wallhackTimers.Clear();
+            CleanupGlowEntities();
         }
         #endregion
 

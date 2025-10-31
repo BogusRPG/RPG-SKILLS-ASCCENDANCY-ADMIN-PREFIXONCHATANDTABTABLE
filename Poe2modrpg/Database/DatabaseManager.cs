@@ -116,10 +116,12 @@ namespace PoE2ModRPG.Database
 
         public void SavePlayer(Player player)
         {
+            using var connection = GetConnection();
+            connection.Open();
+            using var transaction = connection.BeginTransaction();
+
             try
             {
-                using var connection = GetConnection();
-                connection.Open();
                 var command = new MySqlCommand(
                     @"INSERT INTO player_stats (steam_id, level, exp, strength, intelligence, dexterity, stat_points, skill_points)
                         VALUES (@steam_id, @level, @exp, @strength, @intelligence, @dexterity, @stat_points, @skill_points)
@@ -131,7 +133,7 @@ namespace PoE2ModRPG.Database
                             dexterity = VALUES(dexterity),
                             stat_points = VALUES(stat_points),
                             skill_points = VALUES(skill_points);",
-                    connection);
+                    connection, transaction);
 
                 command.Parameters.AddWithValue("@steam_id", player.SteamId);
                 command.Parameters.AddWithValue("@level", player.Level);
@@ -141,27 +143,26 @@ namespace PoE2ModRPG.Database
                 command.Parameters.AddWithValue("@dexterity", player.Dexterity);
                 command.Parameters.AddWithValue("@stat_points", player.StatPoints);
                 command.Parameters.AddWithValue("@skill_points", player.SkillPoints);
-
                 command.ExecuteNonQuery();
 
-                // First, remove all existing skills for the player to handle updates and removals.
                 command.CommandText = "DELETE FROM player_skills WHERE player_steam_id = @steam_id";
                 command.ExecuteNonQuery();
 
-                // Now, insert the current skills.
                 foreach (var skill in player.LearnedSkills)
                 {
-                    command.CommandText = @"INSERT INTO player_skills (player_steam_id, skill_name, level)
-                                                VALUES (@steam_id, @skill_name, @level)";
+                    command.CommandText = "INSERT INTO player_skills (player_steam_id, skill_name, level) VALUES (@steam_id, @skill_name, @level)";
                     command.Parameters.AddWithValue("@skill_name", skill.SkillName);
                     command.Parameters.AddWithValue("@level", skill.Level);
                     command.ExecuteNonQuery();
-                    command.Parameters.RemoveAt("@skill_name");
-                    command.Parameters.RemoveAt("@level");
+                    command.Parameters.Remove("@skill_name");
+                    command.Parameters.Remove("@level");
                 }
+
+                transaction.Commit();
             }
             catch (Exception e)
             {
+                transaction.Rollback();
                 Server.PrintToConsole($"[PoE2ModRPG] Błąd zapisu gracza ({player.SteamId}): {e.Message}");
             }
         }

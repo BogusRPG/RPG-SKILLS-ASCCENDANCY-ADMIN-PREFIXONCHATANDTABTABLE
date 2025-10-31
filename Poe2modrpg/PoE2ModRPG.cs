@@ -84,88 +84,104 @@ namespace PoE2ModRPG
             RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
             RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
 
-            RegisterEventHandler<EventPlayerChat>(OnPlayerChat);
+            AddCommandListener("say", OnPlayerSay);
+            AddCommandListener("say_team", OnPlayerSay);
+
+            AddCommand("staty", "Wyświetla twoje statystyki", (player, info) => OnStatsCommand(player, info.GetArgs()));
+            AddCommand("str", "Dodaje punkt do siły", (player, info) => OnStrCommand(player, info.GetArgs()));
+            AddCommand("int", "Dodaje punkt do inteligencji", (player, info) => OnIntCommand(player, info.GetArgs()));
+            AddCommand("dex", "Dodaje punkt do zręczności", (player, info) => OnDexCommand(player, info.GetArgs()));
+            AddCommand("reset", "Resetuje twoje statystyki", (player, info) => OnResetCommand(player, info.GetArgs()));
+            AddCommand("skills", "Wyświetla dostępne umiejętności", (player, info) => OnSkillsCommand(player, info.GetArgs()));
+            AddCommand("learn", "Uczy cię nowej umiejętności", (player, info) => OnLearnCommand(player, info.GetArgs()));
+            AddCommand("cast", "Używa umiejętności", (player, info) => OnCastCommand(player, info.GetArgs()));
+
+            AddCommand("poe_dxp", "[Admin] Daje EXP graczowi", (player, info) => { if (IsAdmin(player)) OnGiveExpCommand(player, info.GetArgs()); });
+            AddCommand("poe_dskillpkt", "[Admin] Daje punkty umiejętności graczowi", (player, info) => { if (IsAdmin(player)) OnGiveSkillPointsCommand(player, info.GetArgs()); });
+            AddCommand("poe_zskillpkt", "[Admin] Zabiera punkty umiejętności graczowi", (player, info) => { if (IsAdmin(player)) OnTakeSkillPointsCommand(player, info.GetArgs()); });
+            AddCommand("poe_dstatpkt", "[Admin] Daje punkty statystyk graczowi", (player, info) => { if (IsAdmin(player)) OnGiveStatPointsCommand(player, info.GetArgs()); });
+            AddCommand("poe_zstatpkt", "[Admin] Zabiera punkty statystyk graczowi", (player, info) => { if (IsAdmin(player)) OnTakeStatPointsCommand(player, info.GetArgs()); });
+            AddCommand("poe_clearall", "[Admin] Resetuje postęp gracza", (player, info) => { if (IsAdmin(player)) OnResetPlayerCommand(player, info.GetArgs()); });
         }
 
-        private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
+        private HookResult OnPlayerSay(CCSPlayerController? player, CommandInfo info)
         {
-            var player = Utilities.GetPlayerFromUserid(@event.Userid);
-            if (player == null || !player.IsValid || player.IsBot) return HookResult.Continue;
-
-            var message = @event.Text.Trim();
-            if (string.IsNullOrWhiteSpace(message)) return HookResult.Stop;
-
-            if (message.StartsWith("!") || message.StartsWith("/"))
+            if (player == null || !player.IsValid || player.IsBot)
             {
-                var parts = message.Substring(1).Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                var command = parts.Length > 0 ? parts[0].ToLower() : string.Empty;
-                var args = parts.Skip(1).ToArray();
+                return HookResult.Continue;
+            }
 
-                switch (command)
-                {
-                    case "staty": OnStatsCommand(player, args); break;
-                    case "str": OnStrCommand(player, args); break;
-                    case "int": OnIntCommand(player, args); break;
-                    case "dex": OnDexCommand(player, args); break;
-                    case "reset": OnResetCommand(player, args); break;
-                    case "skills": OnSkillsCommand(player, args); break;
-                    case "learn": OnLearnCommand(player, args); break;
-                    case "cast": OnCastCommand(player, args); break;
-                    case "dxp":
-                    case "dskillpkt":
-                    case "zskillpkt":
-                    case "dstatpkt":
-                    case "zstatpkt":
-                    case "clearall":
-                        var adminPlayerData = _playerService.GetPlayer(player.SteamID);
-                        if (adminPlayerData?.Rank.RankValue >= 1)
-                        {
-                            switch (command)
-                            {
-                                case "dxp": OnGiveExpCommand(player, args); break;
-                                case "dskillpkt": OnGiveSkillPointsCommand(player, args); break;
-                                case "zskillpkt": OnTakeSkillPointsCommand(player, args); break;
-                                case "dstatpkt": OnGiveStatPointsCommand(player, args); break;
-                                case "zstatpkt": OnTakeStatPointsCommand(player, args); break;
-                                case "clearall": OnResetPlayerCommand(player, args); break;
-                            }
-                        }
-                        else
-                        {
-                            player.PrintToChat($"{Prefix} Nie masz uprawnień.");
-                        }
-                        break;
-                }
+            var message = info.ArgString.Trim('"');
+            if (string.IsNullOrWhiteSpace(message))
+            {
                 return HookResult.Stop;
             }
 
-            var playerData = _playerService.GetPlayer(player.SteamID);
-            if (playerData == null) return HookResult.Stop;
-
-            if (@event.teamonly)
+            // Handle admin chat
+            if (message.StartsWith("@"))
             {
-                string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
-                string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
-                string teamColor = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
-                string prefix = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
-                string formatted = $"{ChatColors.Blue}[TEAM]{ChatColors.Default} {prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {message}";
+                var adminPlayerData = _playerService.GetPlayer(player.SteamID);
+                if (adminPlayerData?.Rank.RankValue >= 1) // Admins and above
+                {
+                    string rankName = _rankService.GetRankName(adminPlayerData.Rank.RankValue);
+                    string rankColor = _rankService.GetRankColor(adminPlayerData.Rank.RankValue);
+                    string teamColor = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
 
+                    string adminMessage = message.Substring(1);
+                    string formatted = $"{ChatColors.LightRed}[CZAT ADMIN] {rankColor}{rankName} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.Grey}{adminMessage}";
+
+                    foreach (var p in Utilities.GetPlayers())
+                    {
+                        var targetData = _playerService.GetPlayer(p.SteamID);
+                        if (p.IsValid && targetData?.Rank.RankValue >= 1)
+                        {
+                            p.PrintToChat(formatted);
+                        }
+                    }
+                }
+                else
+                {
+                    player.PrintToChat($"{Prefix} Nie masz uprawnień do czatu admina.");
+                }
+                return HookResult.Stop; // Stop the message from appearing in public chat
+            }
+
+            // Check if the message is a command and execute it
+            if (message.StartsWith("!") || message.StartsWith("/"))
+            {
+                var command = message.Substring(1);
+                // Defer command execution to the next server frame
+                AddTimer(0.0f, () => player.ExecuteClientCommand(command));
+                return HookResult.Stop; // Stop the original "say" command
+            }
+
+            // It's a regular chat message, format and send it manually
+            var playerData = _playerService.GetPlayer(player.SteamID);
+            if (playerData == null)
+            {
+                return HookResult.Continue; // Let original message pass if data not loaded
+            }
+
+            string rankNameRegular = _rankService.GetRankName(playerData.Rank.RankValue);
+            string rankColorRegular = _rankService.GetRankColor(playerData.Rank.RankValue);
+            string teamColorRegular = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
+            string prefix = $"[{rankColorRegular}{rankNameRegular}{ChatColors.Default}][LVL{playerData.Level}]";
+
+            if (info.GetArg(0) == "say_team")
+            {
+                string formatted = $"{ChatColors.Blue}[TEAM]{ChatColors.Default} {prefix} {teamColorRegular}{player.PlayerName}{ChatColors.Default}: {ChatColors.Grey}{message}";
                 foreach (var p in Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum && p.IsValid))
                 {
                     p.PrintToChat(formatted);
                 }
             }
-            else
+            else // It's a public message
             {
-                string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
-                string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
-                string teamColor = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
-                string prefix = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
-                string formatted = $"{prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {message}";
+                string formatted = $"{prefix} {teamColorRegular}{player.PlayerName}{ChatColors.Default}: {ChatColors.Grey}{message}";
                 Server.PrintToChatAll(formatted);
             }
 
-            return HookResult.Stop;
+            return HookResult.Stop; // Stop the original game message
         }
 
         private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
@@ -654,6 +670,20 @@ namespace PoE2ModRPG
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
 
             Server.ExecuteCommand($"sv_setsteamaccount {player.SteamID} \"{prefix}\"");
+        }
+        #endregion
+
+        #region Helpers
+        private bool IsAdmin(CCSPlayerController? player)
+        {
+            if (player == null) return false;
+            var playerData = _playerService.GetPlayer(player.SteamID);
+            if (playerData?.Rank.RankValue >= 2) // Opiekun and OWNER
+            {
+                return true;
+            }
+            player.PrintToChat($"{Prefix} Nie masz uprawnień.");
+            return false;
         }
         #endregion
 

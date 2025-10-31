@@ -103,7 +103,18 @@ namespace PoE2ModRPG.Services.Skills
                 if (player == null) continue;
 
                 var observerTarget = player.Pawn?.Value?.ObserverServices?.ObserverTarget?.Value;
-                var observedPlayer = observerTarget != null ? Utilities.GetPlayerFromPawn(observerTarget) : null;
+                CCSPlayerController? observedPlayer = null;
+                if (observerTarget != null)
+                {
+                    foreach (var p in Utilities.GetPlayers())
+                    {
+                        if (p.PlayerPawn.Value == observerTarget)
+                        {
+                            observedPlayer = p;
+                            break;
+                        }
+                    }
+                }
 
                 bool shouldSeeGlow = IsPlayerUsing(player.SteamID) || (observedPlayer != null && IsPlayerUsing(observedPlayer.SteamID));
 

@@ -1,6 +1,6 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Core.Attributes;
+using CounterStrikeSharp.API.Modules.Entities;
 using CounterStrikeSharp.API.Modules.Utils;
 using PoE2ModRPG.Models;
 using System.Collections.Concurrent;
@@ -57,6 +57,7 @@ namespace PoE2ModRPG.Services.Skills
                 if (glow.Item2 != null && glow.Item2.IsValid) glow.Item2.Remove();
             }
             Glows.Clear();
+            PlayersInAction.Clear();
         }
 
         public static bool IsPlayerUsing(ulong steamId) => PlayersInAction.ContainsKey(steamId);
@@ -98,6 +99,8 @@ namespace PoE2ModRPG.Services.Skills
 
         public static void CheckTransmit(CCheckTransmitInfoList infoList)
         {
+            if (Glows.IsEmpty) return;
+
             foreach (var (info, player) in infoList)
             {
                 if (player == null) continue;
@@ -108,7 +111,7 @@ namespace PoE2ModRPG.Services.Skills
                 {
                     foreach (var p in Utilities.GetPlayers())
                     {
-                        if (p.PlayerPawn.Value == observerTarget)
+                        if (p.PlayerPawn.Value?.Handle == observerTarget.Handle)
                         {
                             observedPlayer = p;
                             break;
@@ -124,16 +127,11 @@ namespace PoE2ModRPG.Services.Skills
 
                     if (shouldSeeGlow && isEnemyGlow)
                     {
-                        // Player has WH and the glow is for an enemy, so they should see it. Don't remove transmission.
                         continue;
                     }
 
-                    // For all other cases (player doesn't have WH, or the glow is for a teammate), remove the glow.
-                    var glowEntity1 = Utilities.GetEntityFromIndex<CBaseEntity>((int)glow.Item1.Index);
-                    if (glowEntity1 != null && glowEntity1.IsValid) info.TransmitEntities.Remove(glowEntity1.Index);
-
-                    var glowEntity2 = Utilities.GetEntityFromIndex<CBaseEntity>((int)glow.Item2.Index);
-                    if (glowEntity2 != null && glowEntity2.IsValid) info.TransmitEntities.Remove(glowEntity2.Index);
+                    info.RemoveEntity(glow.Item1);
+                    info.RemoveEntity(glow.Item2);
                 }
             }
         }

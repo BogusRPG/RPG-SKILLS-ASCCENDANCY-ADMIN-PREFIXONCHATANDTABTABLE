@@ -54,19 +54,6 @@ namespace PoE2ModRPG
         {
             Instance = this;
 
-            AddTimer(1.0f, () =>
-            {
-                var worldspawn = Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("worldspawn").FirstOrDefault();
-                if (worldspawn != null)
-                {
-                    worldspawn.HookEntityOutput("OnCheckTransmit", (CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay) =>
-                    {
-                        var infoList = value.Retrieve<CCheckTransmitInfoList>();
-                        Services.Skills.WallhackSkill.CheckTransmit(infoList);
-                    });
-                }
-            });
-
             try
             {
                 _dbManager = new DatabaseManager(Config.Database);
@@ -133,6 +120,11 @@ namespace PoE2ModRPG
 
             AddCommandListener("say", OnPlayerSay);
             AddCommandListener("say_team", OnPlayerSayTeam);
+
+            RegisterListener<Listeners.CheckTransmit>((infoList) =>
+            {
+                Services.Skills.WallhackSkill.CheckTransmit(infoList);
+            });
         }
 
         private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)

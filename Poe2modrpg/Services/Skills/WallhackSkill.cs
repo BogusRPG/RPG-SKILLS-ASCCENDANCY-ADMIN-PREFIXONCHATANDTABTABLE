@@ -27,9 +27,9 @@ namespace PoE2ModRPG.Services.Skills
 
         public override int GetManaCost(int level) => _manaCosts[level - 1];
 
-        public override void OnLearn(Player player, int level) { }
+        public override void OnLearn(Models.Player player, int level) { }
 
-        public override void OnActivate(PoE2ModRPG plugin, CCSPlayerController controller, Player player, int level)
+        public override void OnActivate(PoE2ModRPG plugin, CCSPlayerController controller, Models.Player player, int level)
         {
             PlayersInAction.TryAdd(controller.SteamID, 0);
             if (Glows.IsEmpty)
@@ -130,8 +130,8 @@ namespace PoE2ModRPG.Services.Skills
                         continue;
                     }
 
-                    info.RemoveEntity(glow.Item1);
-                    info.RemoveEntity(glow.Item2);
+                    info.TransmitEntities.Remove(glow.Item1.Index);
+                    info.TransmitEntities.Remove(glow.Item2.Index);
                 }
             }
         }

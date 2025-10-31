@@ -19,6 +19,6 @@ namespace PoE2ModRPG.API
         /// Retrieves the full Player object for a given player.
         /// Returns null if the player is not found.
         /// </summary>
-        Player? GetPlayer(ulong steamId);
+        PoE2ModRPG.Models.Player? GetPlayer(ulong steamId);
     }
 }

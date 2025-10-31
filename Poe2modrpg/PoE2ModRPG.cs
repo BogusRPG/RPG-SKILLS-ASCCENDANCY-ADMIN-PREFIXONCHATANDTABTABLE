@@ -91,14 +91,14 @@ namespace PoE2ModRPG
             Func<CommandInfo, string[]> getArgs = info =>
                 Enumerable.Range(1, info.ArgCount - 1).Select(info.GetArg).ToArray();
 
-            AddCommand("staty", "Wyświetla twoje statystyki", (p, i) => OnStatsCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("str", "Dodaje punkt do siły", (p, i) => OnStrCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("int", "Dodaje punkt do inteligencji", (p, i) => OnIntCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("dex", "Dodaje punkt do zręczności", (p, i) => OnDexCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("reset", "Resetuje twoje statystyki", (p, i) => OnResetCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("skills", "Wyświetla dostępne umiejętności", (p, i) => OnSkillsCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("learn", "Uczy cię nowej umiejętności", (p, i) => OnLearnCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("cast", "Używa umiejętności", (p, i) => OnCastCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("staty", (p, i) => OnStatsCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("str", (p, i) => OnStrCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("int", (p, i) => OnIntCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("dex", (p, i) => OnDexCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("reset", (p, i) => OnResetCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("skills", (p, i) => OnSkillsCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("learn", (p, i) => OnLearnCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("cast", (p, i) => OnCastCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
 
             AddCommand("poe_dxp", "[Admin] Daje EXP graczowi", (p, i) => { if (IsAdmin(p)) OnGiveExpCommand(p, getArgs(i)); });
             AddCommand("poe_dskillpkt", "[Admin] Daje punkty umiejętności graczowi", (p, i) => { if (IsAdmin(p)) OnGiveSkillPointsCommand(p, getArgs(i)); });

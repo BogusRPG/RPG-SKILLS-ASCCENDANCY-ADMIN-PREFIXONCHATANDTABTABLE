@@ -87,21 +87,25 @@ namespace PoE2ModRPG
             AddCommandListener("say", OnPlayerSay);
             AddCommandListener("say_team", OnPlayerSay);
 
-            AddCommand("staty", "Wyświetla twoje statystyki", (player, info) => OnStatsCommand(player, info.GetArgs()));
-            AddCommand("str", "Dodaje punkt do siły", (player, info) => OnStrCommand(player, info.GetArgs()));
-            AddCommand("int", "Dodaje punkt do inteligencji", (player, info) => OnIntCommand(player, info.GetArgs()));
-            AddCommand("dex", "Dodaje punkt do zręczności", (player, info) => OnDexCommand(player, info.GetArgs()));
-            AddCommand("reset", "Resetuje twoje statystyki", (player, info) => OnResetCommand(player, info.GetArgs()));
-            AddCommand("skills", "Wyświetla dostępne umiejętności", (player, info) => OnSkillsCommand(player, info.GetArgs()));
-            AddCommand("learn", "Uczy cię nowej umiejętności", (player, info) => OnLearnCommand(player, info.GetArgs()));
-            AddCommand("cast", "Używa umiejętności", (player, info) => OnCastCommand(player, info.GetArgs()));
+            // Helper to parse arguments, as GetArgs() is deprecated
+            Func<CommandInfo, string[]> getArgs = info =>
+                Enumerable.Range(1, info.ArgCount - 1).Select(info.GetArg).ToArray();
 
-            AddCommand("poe_dxp", "[Admin] Daje EXP graczowi", (player, info) => { if (IsAdmin(player)) OnGiveExpCommand(player, info.GetArgs()); });
-            AddCommand("poe_dskillpkt", "[Admin] Daje punkty umiejętności graczowi", (player, info) => { if (IsAdmin(player)) OnGiveSkillPointsCommand(player, info.GetArgs()); });
-            AddCommand("poe_zskillpkt", "[Admin] Zabiera punkty umiejętności graczowi", (player, info) => { if (IsAdmin(player)) OnTakeSkillPointsCommand(player, info.GetArgs()); });
-            AddCommand("poe_dstatpkt", "[Admin] Daje punkty statystyk graczowi", (player, info) => { if (IsAdmin(player)) OnGiveStatPointsCommand(player, info.GetArgs()); });
-            AddCommand("poe_zstatpkt", "[Admin] Zabiera punkty statystyk graczowi", (player, info) => { if (IsAdmin(player)) OnTakeStatPointsCommand(player, info.GetArgs()); });
-            AddCommand("poe_clearall", "[Admin] Resetuje postęp gracza", (player, info) => { if (IsAdmin(player)) OnResetPlayerCommand(player, info.GetArgs()); });
+            AddCommand("staty", "Wyświetla twoje statystyki", (p, i) => OnStatsCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("str", "Dodaje punkt do siły", (p, i) => OnStrCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("int", "Dodaje punkt do inteligencji", (p, i) => OnIntCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("dex", "Dodaje punkt do zręczności", (p, i) => OnDexCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("reset", "Resetuje twoje statystyki", (p, i) => OnResetCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("skills", "Wyświetla dostępne umiejętności", (p, i) => OnSkillsCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("learn", "Uczy cię nowej umiejętności", (p, i) => OnLearnCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+            AddCommand("cast", "Używa umiejętności", (p, i) => OnCastCommand(p, getArgs(i)), ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
+
+            AddCommand("poe_dxp", "[Admin] Daje EXP graczowi", (p, i) => { if (IsAdmin(p)) OnGiveExpCommand(p, getArgs(i)); });
+            AddCommand("poe_dskillpkt", "[Admin] Daje punkty umiejętności graczowi", (p, i) => { if (IsAdmin(p)) OnGiveSkillPointsCommand(p, getArgs(i)); });
+            AddCommand("poe_zskillpkt", "[Admin] Zabiera punkty umiejętności graczowi", (p, i) => { if (IsAdmin(p)) OnTakeSkillPointsCommand(p, getArgs(i)); });
+            AddCommand("poe_dstatpkt", "[Admin] Daje punkty statystyk graczowi", (p, i) => { if (IsAdmin(p)) OnGiveStatPointsCommand(p, getArgs(i)); });
+            AddCommand("poe_zstatpkt", "[Admin] Zabiera punkty statystyk graczowi", (p, i) => { if (IsAdmin(p)) OnTakeStatPointsCommand(p, getArgs(i)); });
+            AddCommand("poe_clearall", "[Admin] Resetuje postęp gracza", (p, i) => { if (IsAdmin(p)) OnResetPlayerCommand(p, getArgs(i)); });
         }
 
         private HookResult OnPlayerSay(CCSPlayerController? player, CommandInfo info)

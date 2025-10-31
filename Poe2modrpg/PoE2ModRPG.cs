@@ -30,6 +30,11 @@ namespace PoE2ModRPG
         private static readonly string Prefix = $" {ChatColors.Gold}[PoE2Mod]{ChatColors.Default}";
         private readonly Dictionary<ulong, Timer> _manaRegenTimers = new();
         private readonly List<Services.Skills.ActiveVampirismEffect> _activeVampirismEffects = new();
+        private readonly List<string> _pluginCommands = new List<string>
+        {
+            "staty", "str", "int", "dex", "reset", "dbtest", "skills", "learn", "cast",
+            "dxp", "dskillpkt", "zskillpkt", "dstatpkt", "zstatpkt", "clearall"
+        };
 
         private DatabaseManager _dbManager = null!;
         private PlayerService _playerService = null!;
@@ -75,36 +80,20 @@ namespace PoE2ModRPG
                 throw;
             }
 
-            AddCommand("staty", "Pokazuje statystyki", OnStatsCommand);
             AddCommand("poe_staty", "Pokazuje statystyki", OnStatsCommand);
-            AddCommand("str", "Dodaje punkty do Siły", OnStrCommand);
             AddCommand("poe_str", "Dodaje punkty do Siły", OnStrCommand);
-            AddCommand("int", "Dodaje punkty do Inteligencji", OnIntCommand);
             AddCommand("poe_int", "Dodaje punkty do Inteligencji", OnIntCommand);
-            AddCommand("dex", "Dodaje punkty do Zręczności", OnDexCommand);
             AddCommand("poe_dex", "Dodaje punkty do Zręczności", OnDexCommand);
-            AddCommand("reset", "Resetuje statystyki", OnResetCommand);
             AddCommand("poe_reset", "Resetuje statystyki", OnResetCommand);
-            AddCommand("dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
             AddCommand("poe_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
-            AddCommand("skills", "Shows available skills", OnSkillsCommand);
             AddCommand("poe_skills", "Shows available skills", OnSkillsCommand);
-            AddCommand("learn", "Learn a skill", OnLearnCommand);
             AddCommand("poe_learn", "Learn a skill", OnLearnCommand);
-            AddCommand("cast", "Casts a skill", OnCastCommand);
             AddCommand("poe_cast", "Casts a skill", OnCastCommand);
-
-            AddCommand("dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
             AddCommand("poe_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
-            AddCommand("dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
             AddCommand("poe_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
-            AddCommand("zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
             AddCommand("poe_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
-            AddCommand("dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
             AddCommand("poe_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
-            AddCommand("zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
             AddCommand("poe_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
-            AddCommand("clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
             AddCommand("poe_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
 
             RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
@@ -613,8 +602,18 @@ namespace PoE2ModRPG
 
             if (text.StartsWith("!") || text.StartsWith("/"))
             {
-                var command = text.Substring(1);
-                player.ExecuteClientCommand(command);
+                var commandText = text.Substring(1);
+                var commandParts = commandText.Split(' ');
+                var command = commandParts[0];
+
+                if (_pluginCommands.Contains(command, StringComparer.OrdinalIgnoreCase))
+                {
+                    player.ExecuteClientCommand($"poe_{commandText}");
+                }
+                else
+                {
+                    player.ExecuteClientCommand(commandText);
+                }
                 return;
             }
 

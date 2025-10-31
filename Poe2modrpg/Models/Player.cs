@@ -39,7 +39,6 @@ namespace PoE2ModRPG.Models
         [NotMapped]
         public int MaxMana { get; set; } = 100;
 
-        [NotMapped]
         public List<PlayerSkill> LearnedSkills { get; set; } = new();
 
         [NotMapped]

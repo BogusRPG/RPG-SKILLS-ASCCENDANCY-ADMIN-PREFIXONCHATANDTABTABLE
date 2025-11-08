@@ -114,7 +114,11 @@ namespace PoE2ModRPG
 
         public override void OnAllPluginsLoaded(bool hotReload)
         {
-            _chatManager = PluginManager.GetPlugin("ChatManager");
+            var plugin = PluginManager.GetPlugin<IPlugin>("ChatManager");
+            if (plugin != null)
+            {
+                _chatManager = plugin;
+            }
         }
 
         private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)

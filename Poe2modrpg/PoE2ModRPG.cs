@@ -114,7 +114,7 @@ namespace PoE2ModRPG
 
         public override void OnAllPluginsLoaded(bool hotReload)
         {
-            var plugin = PluginManager.GetPlugin<IPlugin>("ChatManager");
+            var plugin = CounterStrikeSharp.API.PluginManager.GetPlugin<IPlugin>("ChatManager");
             if (plugin != null)
             {
                 _chatManager = plugin;

@@ -788,13 +788,27 @@ namespace PoE2ModRPG
             var instance = (PoE2ModRPG)Instance;
             foreach (var info in infoList)
             {
-                var player = Utilities.GetPlayerFromUserid(info.Recipient.Index);
+                var player = info.Recipient?.Value;
                 if (player == null) continue;
 
                 var pawn = player.PlayerPawn.Value;
                 if (pawn == null) continue;
 
-                var observedPlayer = Utilities.GetPlayerFromHandle(pawn.ObserverServices!.ObserverTarget.Value.Handle);
+                var observerServices = pawn.ObserverServices;
+                if (observerServices == null) continue;
+
+                var observerTarget = observerServices.ObserverTarget;
+                if (observerTarget == null || observerTarget.Value == null) continue;
+
+                CCSPlayerController? observedPlayer = null;
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p.Pawn.Value != null && p.Pawn.Value.Handle == observerTarget.Value.Handle)
+                    {
+                        observedPlayer = p;
+                        break;
+                    }
+                }
 
                 bool shouldSeeGlow = instance._wallhackTimers.ContainsKey(player.SteamID) || (observedPlayer != null && instance._wallhackTimers.ContainsKey(observedPlayer.SteamID));
 

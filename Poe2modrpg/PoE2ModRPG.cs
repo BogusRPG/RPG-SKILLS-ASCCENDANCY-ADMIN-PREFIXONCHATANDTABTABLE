@@ -20,7 +20,7 @@ using System.Collections.Concurrent;
 
 namespace PoE2ModRPG
 {
-    [MinimumApiVersion(343)]
+    [MinimumApiVersion(346)]
     public class PoE2ModRPG : BasePlugin, IPluginConfig<PluginConfig>, IPoe2ModApi
     {
         public override string ModuleName => "PoE2ModRPG";
@@ -30,9 +30,10 @@ namespace PoE2ModRPG
 
         private static readonly string Prefix = $" {ChatColors.Gold}[PoE2Mod]{ChatColors.Default}";
         private readonly Dictionary<ulong, Timer> _manaRegenTimers = new();
+        private readonly Dictionary<ulong, Timer> _hudTimers = new();
         private readonly List<Services.Skills.ActiveVampirismEffect> _activeVampirismEffects = new();
         private readonly ConcurrentDictionary<ulong, Timer> _wallhackTimers = new();
-        private readonly ConcurrentBag<CHandle<CDynamicProp>> _glowEntities = new();
+        private readonly ConcurrentBag<(CHandle<CDynamicProp>, CHandle<CDynamicProp>)> _glowEntities = new();
 
         private DatabaseManager _dbManager = null!;
         private PlayerService _playerService = null!;
@@ -142,6 +143,11 @@ namespace PoE2ModRPG
                 _manaRegenTimers[player.SteamID] = AddTimer(1.0f, () => RegenerateMana(player), TimerFlags.REPEAT);
             }
 
+            if (!_hudTimers.ContainsKey(player.SteamID))
+            {
+                _hudTimers[player.SteamID] = AddTimer(0.1f, () => UpdateHud(player), TimerFlags.REPEAT);
+            }
+
             return HookResult.Continue;
         }
 
@@ -161,6 +167,12 @@ namespace PoE2ModRPG
             {
                 timer.Kill();
                 _manaRegenTimers.Remove(player.SteamID);
+            }
+
+            if (_hudTimers.TryGetValue(player.SteamID, out var hudTimer))
+            {
+                hudTimer.Kill();
+                _hudTimers.Remove(player.SteamID);
             }
             return HookResult.Continue;
         }
@@ -733,34 +745,6 @@ namespace PoE2ModRPG
             {
                 RegisterListener<Listeners.OnCheckTransmit>(OnCheckTransmit);
             }
-            ApplyGlowsToPlayers();
-        }
-
-        private void ApplyGlowsToPlayers()
-        {
-            CleanupGlowEntities();
-            foreach (var p in Utilities.GetPlayers())
-            {
-                if (p == null || !p.IsValid || !p.PawnIsAlive || p.IsBot) continue;
-
-                var pawn = p.PlayerPawn.Value;
-                if (pawn == null) continue;
-
-                var modelGlow = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic");
-                if (modelGlow == null) continue;
-
-                modelGlow.SetModel(pawn.CBodyComponent!.SceneNode!.GetSkeletonInstance().ModelState.ModelName);
-                modelGlow.DispatchSpawn();
-                modelGlow.Teleport(pawn.AbsOrigin, pawn.AbsRotation, pawn.AbsVelocity);
-
-                modelGlow.Glow.GlowColorOverride = p.Team == CsTeam.Terrorist ? System.Drawing.Color.FromArgb(255, 255, 165, 0) : System.Drawing.Color.FromArgb(255, 173, 216, 230);
-                modelGlow.Glow.GlowRange = 5000;
-                modelGlow.Glow.GlowTeam = (int)p.Team;
-                modelGlow.Glow.GlowType = 3;
-                modelGlow.Glow.GlowRangeMin = 100;
-
-                _glowEntities.Add(new CHandle<CDynamicProp>(modelGlow.Index, modelGlow.SerialNumber));
-            }
         }
 
         private void OnCheckTransmit(CCheckTransmitInfoList infoList)
@@ -776,25 +760,16 @@ namespace PoE2ModRPG
 
                 if (!shouldSeeGlow)
                 {
-                    foreach (var glowEntity in _glowEntities)
+                    foreach (var (modelRelay, modelGlow) in _glowEntities)
                     {
-                        if (glowEntity.Value != null)
-                            info.TransmitEntities.Remove(glowEntity.Value.Index);
+                        if (modelRelay.Value != null)
+                            info.TransmitEntities.Remove(modelRelay.Value.Index);
+
+                        if (modelGlow.Value != null)
+                            info.TransmitEntities.Remove(modelGlow.Value.Index);
                     }
                 }
             }
-        }
-
-        private void CleanupGlowEntities()
-        {
-            foreach (var entity in _glowEntities)
-            {
-                if (entity.Value != null)
-                {
-                    entity.Value.Remove();
-                }
-            }
-            _glowEntities.Clear();
         }
 
         private void CleanupWallhack()
@@ -808,7 +783,35 @@ namespace PoE2ModRPG
                 timer.Kill();
             }
             _wallhackTimers.Clear();
-            CleanupGlowEntities();
+
+            foreach (var (modelRelay, modelGlow) in _glowEntities)
+            {
+                if (modelRelay.Value != null)
+                    modelRelay.Value.Remove();
+
+                if (modelGlow.Value != null)
+                    modelGlow.Value.Remove();
+            }
+            _glowEntities.Clear();
+        }
+        #endregion
+
+        #region HUD Logic
+        private void UpdateHud(CCSPlayerController player)
+        {
+            if (player == null || !player.IsValid) return;
+
+            var playerData = _playerService.GetPlayer(player.SteamID);
+            if (playerData == null) return;
+
+            var pawn = player.PlayerPawn.Value;
+            if (pawn == null) return;
+
+            int requiredExp = 100 + (playerData.Level - 1) * 50;
+
+            player.PrintToCenterHtml(
+                $"Poziom: {playerData.Level} | HP: {pawn.Health}/{pawn.MaxHealth} | Mana: {playerData.Mana}/{playerData.MaxMana} | EXP: {playerData.Exp}/{requiredExp}"
+            );
         }
         #endregion
 

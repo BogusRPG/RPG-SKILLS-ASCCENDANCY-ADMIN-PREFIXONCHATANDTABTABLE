@@ -618,7 +618,7 @@ namespace PoE2ModRPG
         #endregion
 
         #region Chat Handling
-        private readonly string[] _pluginCommands = { "staty", "str", "int", "dex", "reset", "dbtest", "skills", "learn", "cast", "komendy" };
+        private readonly string[] _pluginCommands = { "staty", "str", "int", "dex", "reset", "dbtest", "skills", "learn", "cast", "komendy", "dxp", "dskillpkt", "zskillpkt", "dstatpkt", "zstatpkt", "clearall" };
         private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
         {
             var player = Utilities.GetPlayerFromUserid(@event.Userid);
@@ -635,7 +635,7 @@ namespace PoE2ModRPG
 
                 if (_pluginCommands.Contains(command))
                 {
-                    player.ExecuteClientCommand(commandText);
+                    player.ExecuteClientCommand($"css_{commandText}");
                     return HookResult.Stop;
                 }
             }
@@ -741,8 +741,8 @@ namespace PoE2ModRPG
             if (_wallhackTimers.Count == 1)
             {
                 Listeners.OnCheckTransmit.Register(OnCheckTransmit);
-                ApplyGlowsToPlayers();
             }
+            ApplyGlowsToPlayers();
         }
 
         private void ApplyGlowsToPlayers()
@@ -777,26 +777,30 @@ namespace PoE2ModRPG
                 modelGlow.AcceptInput("FollowEntity", modelRelay, modelGlow, "!activator");
 
                 _glowEntities.Add((
-                    new CHandle<CDynamicProp>(modelRelay.Index, modelRelay.SerialNumber),
-                    new CHandle<CDynamicProp>(modelGlow.Index, modelGlow.SerialNumber)
+                    new CHandle<CDynamicProp>(modelRelay),
+                    new CHandle<CDynamicProp>(modelGlow)
                 ));
             }
         }
 
-        private static void OnCheckTransmit(dynamic infoList)
+        private static void OnCheckTransmit(CCheckTransmitInfoList infoList)
         {
+            var instance = (PoE2ModRPG)Instance;
             foreach (var info in infoList)
             {
-                var player = info.Player;
+                var player = Utilities.GetPlayerFromUserid(info.Recipient.Index);
                 if (player == null) continue;
 
-                var observedPlayer = Utilities.GetPlayers().FirstOrDefault(p => p?.Pawn?.Value?.ObserverServices?.ObserverTarget?.Value?.Handle == player.Pawn?.Value?.Handle);
+                var pawn = player.PlayerPawn.Value;
+                if (pawn == null) continue;
 
-                bool shouldSeeGlow = Instance._wallhackTimers.ContainsKey(player.SteamID) || (observedPlayer != null && Instance._wallhackTimers.ContainsKey(observedPlayer.SteamID));
+                var observedPlayer = Utilities.GetPlayerFromHandle(pawn.ObserverServices!.ObserverTarget.Value.Handle);
+
+                bool shouldSeeGlow = instance._wallhackTimers.ContainsKey(player.SteamID) || (observedPlayer != null && instance._wallhackTimers.ContainsKey(observedPlayer.SteamID));
 
                 if (!shouldSeeGlow)
                 {
-                    foreach (var (modelRelay, modelGlow) in Instance._glowEntities)
+                    foreach ((CHandle<CDynamicProp> modelRelay, CHandle<CDynamicProp> modelGlow) in instance._glowEntities)
                     {
                         if (modelRelay.Value != null)
                             info.TransmitEntities.Remove(modelRelay.Value.Index);

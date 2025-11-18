@@ -16,10 +16,12 @@ using PoE2ModRPG.Services;
 using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 using MySqlConnector;
 using System.Linq;
+using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace PoE2ModRPG
 {
-    [MinimumApiVersion(343)]
+    [MinimumApiVersion(346)]
     public class PoE2ModRPG : BasePlugin, IPluginConfig<PluginConfig>, IPoe2ModApi
     {
         public override string ModuleName => "PoE2ModRPG";
@@ -29,7 +31,10 @@ namespace PoE2ModRPG
 
         private static readonly string Prefix = $" {ChatColors.Gold}[PoE2Mod]{ChatColors.Default}";
         private readonly Dictionary<ulong, Timer> _manaRegenTimers = new();
+        private readonly Dictionary<ulong, Timer> _hudTimers = new();
         private readonly List<Services.Skills.ActiveVampirismEffect> _activeVampirismEffects = new();
+        private readonly ConcurrentDictionary<ulong, Timer> _wallhackTimers = new();
+        private readonly ConcurrentBag<(CHandle<CDynamicProp>, CHandle<CDynamicProp>)> _glowEntities = new();
 
         private DatabaseManager _dbManager = null!;
         private PlayerService _playerService = null!;
@@ -38,6 +43,8 @@ namespace PoE2ModRPG
         private CooldownManager _cooldownManager = null!;
         private AdminService _adminService = null!;
         private RankService _rankService = null!;
+
+        private IPlugin? _chatManager;
 
         public PluginConfig Config { get; set; } = new();
         public void OnConfigParsed(PluginConfig config) => Config = config;
@@ -64,6 +71,7 @@ namespace PoE2ModRPG
                 _skillManager.RegisterSkill(new Services.Skills.HealSkill());
                 _skillManager.RegisterSkill(new Services.Skills.SpeedBoostSkill());
                 _skillManager.RegisterSkill(new Services.Skills.VampirismSkill());
+                _skillManager.RegisterSkill(new Services.Skills.WallhackSkill());
                 _cooldownManager = new CooldownManager();
                 _adminService = new AdminService(_playerService, _levelingService, _dbManager);
                 _rankService = new RankService(_dbManager);
@@ -75,49 +83,42 @@ namespace PoE2ModRPG
                 throw;
             }
 
-            AddCommand("staty", "Pokazuje statystyki", OnStatsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_staty", "Pokazuje statystyki", OnStatsCommand);
-            AddCommand("str", "Dodaje punkty do Siły", OnStrCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_str", "Dodaje punkty do Siły", OnStrCommand);
-            AddCommand("int", "Dodaje punkty do Inteligencji", OnIntCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_int", "Dodaje punkty do Inteligencji", OnIntCommand);
-            AddCommand("dex", "Dodaje punkty do Zręczności", OnDexCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_dex", "Dodaje punkty do Zręczności", OnDexCommand);
-            AddCommand("reset", "Resetuje statystyki", OnResetCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_reset", "Resetuje statystyki", OnResetCommand);
-            AddCommand("dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
-            AddCommand("poe_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
-            AddCommand("skills", "Shows available skills", OnSkillsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_skills", "Shows available skills", OnSkillsCommand);
-            AddCommand("learn", "Learn a skill", OnLearnCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_learn", "Learn a skill", OnLearnCommand);
-            AddCommand("cast", "Casts a skill", OnCastCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_cast", "Casts a skill", OnCastCommand);
-
-            AddCommand("dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
-            AddCommand("dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
-            AddCommand("zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
-            AddCommand("dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
-            AddCommand("zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
-            AddCommand("clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand, ConVarFlags.FCVAR_CLIENT_CAN_EXECUTE);
-            AddCommand("poe_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
+            AddCommand("css_staty", "Pokazuje statystyki", OnStatsCommand);
+            AddCommand("css_str", "Dodaje punkty do Siły", OnStrCommand);
+            AddCommand("css_int", "Dodaje punkty do Inteligencji", OnIntCommand);
+            AddCommand("css_dex", "Dodaje punkty do Zręczności", OnDexCommand);
+            AddCommand("css_reset", "Resetuje statystyki", OnResetCommand);
+            AddCommand("css_dbtest", "Test zapisu do bazy danych", OnDbTestCommand);
+            AddCommand("css_skills", "Shows available skills", OnSkillsCommand);
+            AddCommand("css_learn", "Learn a skill", OnLearnCommand);
+            AddCommand("css_cast", "Casts a skill", OnCastCommand);
+            AddCommand("css_komendy", "Pokazuje listę dostępnych komend", OnCommandsCommand);
+            AddCommand("css_dxp", "Daje graczowi punkty doświadczenia", OnGiveExpCommand);
+            AddCommand("css_dskillpkt", "Daje graczowi punkty umiejętności", OnGiveSkillPointsCommand);
+            AddCommand("css_zskillpkt", "Zabiera graczowi punkty umiejętności", OnTakeSkillPointsCommand);
+            AddCommand("css_dstatpkt", "Daje graczowi punkty statystyk", OnGiveStatPointsCommand);
+            AddCommand("css_zstatpkt", "Zabiera graczowi punkty statystyk", OnTakeStatPointsCommand);
+            AddCommand("css_clearall", "Resetuje cały postęp gracza", OnResetPlayerCommand);
 
             RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
             RegisterEventHandler<EventBombPlanted>(OnBombPlanted);
             RegisterEventHandler<EventBombDefused>(OnBombDefused);
             RegisterEventHandler<EventRoundEnd>(OnRoundEnd);
+            RegisterEventHandler<EventRoundStart>(OnRoundStart);
             RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
             RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
             RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
             RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
+            RegisterEventHandler<EventPlayerChat>(OnPlayerChat);
+        }
 
-            AddCommandListener("say", OnPlayerSay);
-            AddCommandListener("say_team", OnPlayerSayTeam);
+        public override void OnAllPluginsLoaded(bool hotReload)
+        {
+            var plugin = CounterStrikeSharp.API.Core.PluginManager.GetPlugin<IPlugin>("ChatManager");
+            if (plugin != null)
+            {
+                _chatManager = plugin;
+            }
         }
 
         private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
@@ -135,6 +136,10 @@ namespace PoE2ModRPG
             if (!_manaRegenTimers.ContainsKey(player.SteamID))
             {
                 _manaRegenTimers[player.SteamID] = AddTimer(1.0f, () => RegenerateMana(player), TimerFlags.REPEAT);
+            }
+            if (!_hudTimers.ContainsKey(player.SteamID))
+            {
+                _hudTimers[player.SteamID] = AddTimer(0.1f, () => UpdateHud(player), TimerFlags.REPEAT);
             }
 
             return HookResult.Continue;
@@ -156,6 +161,11 @@ namespace PoE2ModRPG
             {
                 timer.Kill();
                 _manaRegenTimers.Remove(player.SteamID);
+            }
+            if (_hudTimers.TryGetValue(player.SteamID, out var hudTimer))
+            {
+                hudTimer.Kill();
+                _hudTimers.Remove(player.SteamID);
             }
             return HookResult.Continue;
         }
@@ -234,6 +244,12 @@ namespace PoE2ModRPG
             }
             return HookResult.Continue;
         }
+
+        private HookResult OnRoundStart(EventRoundStart ev, GameEventInfo info)
+        {
+            CleanupWallhack();
+            return HookResult.Continue;
+        }
         #endregion
 
         #region Commands
@@ -284,7 +300,7 @@ namespace PoE2ModRPG
             {
                 string statName = "";
                 string statColor = ChatColors.Default.ToString();
-                switch(stat)
+                switch (stat)
                 {
                     case "str": playerData.Strength += pointsToAdd; statName = "Siły"; statColor = ChatColors.Red.ToString(); break;
                     case "int": playerData.Intelligence += pointsToAdd; statName = "Inteligencji"; statColor = ChatColors.Blue.ToString(); break;
@@ -329,7 +345,7 @@ namespace PoE2ModRPG
                 command.ExecuteNonQuery();
                 caller.PrintToChat($"{Prefix} DB zapis działa!");
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Server.PrintToConsole($"[PoE2ModRPG] Błąd komendy dbtest: {e.Message}");
                 caller.PrintToChat($"{Prefix} {ChatColors.Red}Błąd zapisu do DB! Sprawdź konsolę serwera.");
@@ -344,6 +360,21 @@ namespace PoE2ModRPG
             {
                 caller.PrintToChat($" - {skill.Name} (Maks. Poziom: {skill.MaxLevel}): {skill.Description}");
             }
+        }
+
+        private void OnCommandsCommand(CCSPlayerController? caller, CommandInfo info)
+        {
+            if (caller == null) return;
+
+            caller.PrintToChat($"{Prefix} Dostępne komendy:");
+            caller.PrintToChat($" {ChatColors.LightRed}/staty{ChatColors.Default} - Wyświetla twoje statystyki.");
+            caller.PrintToChat($" {ChatColors.LightRed}/str [ilość]{ChatColors.Default} - Dodaje punkty siły.");
+            caller.PrintToChat($" {ChatColors.LightRed}/int [ilość]{ChatColors.Default} - Dodaje punkty inteligencji.");
+            caller.PrintToChat($" {ChatColors.LightRed}/dex [ilość]{ChatColors.Default} - Dodaje punkty zręczności.");
+            caller.PrintToChat($" {ChatColors.LightRed}/reset{ChatColors.Default} - Resetuje statystyki, zwracając punkty.");
+            caller.PrintToChat($" {ChatColors.LightRed}/skills{ChatColors.Default} - Pokazuje dostępne umiejętności.");
+            caller.PrintToChat($" {ChatColors.LightRed}/learn <nazwa>{ChatColors.Default} - Uczy się lub ulepsza umiejętność.");
+            caller.PrintToChat($" {ChatColors.LightRed}/cast <nazwa>{ChatColors.Default} - Używa umiejętności aktywnej.");
         }
 
         private void OnLearnCommand(CCSPlayerController? caller, CommandInfo info)
@@ -476,6 +507,10 @@ namespace PoE2ModRPG
                 playerData.Mana = playerData.MaxMana;
 
                 UpdatePlayerPrefix(player);
+                if (!_wallhackTimers.IsEmpty)
+                {
+                    ApplyGlowsToPlayers();
+                }
             });
             return HookResult.Continue;
         }
@@ -506,7 +541,7 @@ namespace PoE2ModRPG
         private void OnGiveExpCommand(CCSPlayerController? caller, CommandInfo info)
         {
             if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_dxp <nazwa_gracza> <ilość>"); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_dxp <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
             if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
@@ -520,7 +555,7 @@ namespace PoE2ModRPG
         private void OnGiveSkillPointsCommand(CCSPlayerController? caller, CommandInfo info)
         {
             if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_dskillpkt <nazwa_gracza> <ilość>"); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_dskillpkt <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
             if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
@@ -534,7 +569,7 @@ namespace PoE2ModRPG
         private void OnTakeSkillPointsCommand(CCSPlayerController? caller, CommandInfo info)
         {
             if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_zskillpkt <nazwa_gracza> <ilość>"); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_zskillpkt <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
             if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
@@ -548,7 +583,7 @@ namespace PoE2ModRPG
         private void OnGiveStatPointsCommand(CCSPlayerController? caller, CommandInfo info)
         {
             if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_dstatpkt <nazwa_gracza> <ilość>"); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_dstatpkt <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
             if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
@@ -562,7 +597,7 @@ namespace PoE2ModRPG
         private void OnTakeStatPointsCommand(CCSPlayerController? caller, CommandInfo info)
         {
             if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: poe_zstatpkt <nazwa_gracza> <ilość>"); return; }
+            if (info.ArgCount < 3) { caller?.PrintToChat($"{Prefix} Użycie: css_zstatpkt <nazwa_gracza> <ilość>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
             if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
@@ -576,7 +611,7 @@ namespace PoE2ModRPG
         private void OnResetPlayerCommand(CCSPlayerController? caller, CommandInfo info)
         {
             if (!HasAdminPermission(caller)) { caller?.PrintToChat($"{Prefix} Nie masz uprawnień do użycia tej komendy."); return; }
-            if (info.ArgCount < 2) { caller?.PrintToChat($"{Prefix} Użycie: poe_clearall <nazwa_gracza>"); return; }
+            if (info.ArgCount < 2) { caller?.PrintToChat($"{Prefix} Użycie: css_clearall <nazwa_gracza>"); return; }
 
             var player = _adminService.FindPlayer(info.GetArg(1));
             if (player == null) { caller?.PrintToChat($"{Prefix} Nie znaleziono gracza."); return; }
@@ -587,79 +622,51 @@ namespace PoE2ModRPG
         #endregion
 
         #region Chat Handling
-        private HookResult OnPlayerSay(CCSPlayerController? player, CommandInfo info)
+        private readonly string[] _pluginCommands = { "staty", "str", "int", "dex", "reset", "dbtest", "skills", "learn", "cast", "komendy", "dxp", "dskillpkt", "zskillpkt", "dstatpkt", "zstatpkt", "clearall" };
+        private HookResult OnPlayerChat(EventPlayerChat @event, GameEventInfo info)
         {
-            if (player == null || !player.IsValid)
-                return HookResult.Continue;
+            var player = Utilities.GetPlayerFromUserid(@event.Userid);
+            if (player == null) return HookResult.Continue;
 
-            HandleChatMessage(player, info.GetArg(1), false);
-            return HookResult.Stop;
-        }
-
-        private HookResult OnPlayerSayTeam(CCSPlayerController? player, CommandInfo info)
-        {
-            if (player == null || !player.IsValid)
-                return HookResult.Continue;
-
-            HandleChatMessage(player, info.GetArg(1), true);
-            return HookResult.Stop;
-        }
-
-        private void HandleChatMessage(CCSPlayerController player, string text, bool teamOnly)
-        {
-            text = text.Trim();
-            if (string.IsNullOrWhiteSpace(text))
-                return;
+            var text = @event.Text.Trim();
+            if (string.IsNullOrWhiteSpace(text)) return HookResult.Continue;
 
             if (text.StartsWith("!") || text.StartsWith("/"))
             {
-                var command = text.Substring(1);
-                player.ExecuteClientCommand(command);
-                return;
+                var commandText = text.Substring(1);
+                var commandParts = commandText.Split(' ');
+                var command = commandParts[0].ToLower();
+
+                if (_pluginCommands.Contains(command))
+                {
+                    player.ExecuteClientCommand($"css_{commandText}");
+                    return HookResult.Stop;
+                }
             }
-
-            var playerData = _playerService.GetPlayer(player.SteamID);
-            if (playerData == null)
-                return;
-
-            string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
-            string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
-            string teamColor = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
-
-            string prefix = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
-
-            if (text.StartsWith("@"))
+            else if (text.StartsWith("@"))
             {
                 var adminMessage = text.Substring(1);
-                if (string.IsNullOrWhiteSpace(adminMessage))
-                    return;
+                if (string.IsNullOrWhiteSpace(adminMessage)) return HookResult.Continue;
+
+                var playerData = _playerService.GetPlayer(player.SteamID);
+                if (playerData == null || playerData.Rank.RankValue < 1) return HookResult.Continue;
+
+                string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
+                string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
+                string teamColor = player.TeamNum == 2 ? ChatColors.Orange.ToString() : ChatColors.Blue.ToString();
+                string prefix = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
 
                 var message = $"{ChatColors.LightRed}[CZAT ADMIN]{ChatColors.Default} {prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.Grey}{adminMessage}{ChatColors.Default}";
-                var admins = Utilities.GetPlayers()
-                    .Where(p => _playerService.GetPlayer(p.SteamID)?.Rank.RankValue >= 1);
+                var admins = Utilities.GetPlayers().Where(p => _playerService.GetPlayer(p.SteamID)?.Rank.RankValue >= 1);
 
                 foreach (var admin in admins)
                 {
                     admin.PrintToChat(message);
                 }
-                return;
+                return HookResult.Stop;
             }
 
-            string normalMessage;
-            if (teamOnly)
-            {
-                normalMessage = $"{prefix} {teamColor}{player.PlayerName}{ChatColors.Default} (TEAM): {ChatColors.Grey}{text}{ChatColors.Default}";
-                var teamMembers = Utilities.GetPlayers().Where(p => p.TeamNum == player.TeamNum);
-                foreach (var member in teamMembers)
-                {
-                    member.PrintToChat(normalMessage);
-                }
-            }
-            else
-            {
-                normalMessage = $"{prefix} {teamColor}{player.PlayerName}{ChatColors.Default}: {ChatColors.Grey}{text}{ChatColors.Default}";
-                Server.PrintToChatAll(normalMessage);
-            }
+            return HookResult.Continue;
         }
         #endregion
 
@@ -687,20 +694,191 @@ namespace PoE2ModRPG
         #endregion
 
         #region Prefix Logic
+        private void SetPlayerChatTag(CCSPlayerController player, string tag, string chatColor)
+        {
+            if (_chatManager == null) return;
+            try
+            {
+                dynamic chatManagerApi = _chatManager;
+                chatManagerApi.SetPlayerChatTag(player, tag, chatColor);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"[PoE2ModRPG] Error calling ChatManager API: {e.Message}");
+            }
+        }
+
         public void UpdatePlayerPrefix(CCSPlayerController player)
         {
             var playerData = _playerService.GetPlayer(player.SteamID);
             if (playerData == null) return;
 
             string rankName = _rankService.GetRankName(playerData.Rank.RankValue);
+            string rankColor = _rankService.GetRankColor(playerData.Rank.RankValue);
             string prefix = $"[{rankName}][LVL{playerData.Level}]";
+            string chatTag = $"[{rankColor}{rankName}{ChatColors.Default}][LVL{playerData.Level}]";
 
             Server.ExecuteCommand($"sv_setsteamaccount {player.SteamID} \"{prefix}\"");
+            SetPlayerChatTag(player, chatTag, rankColor);
+        }
+        #endregion
+
+        #region Wallhack Logic
+        public void ActivateWallhack(ulong steamId)
+        {
+            if (_wallhackTimers.ContainsKey(steamId)) return;
+
+            var timer = AddTimer(10.0f, () =>
+            {
+                if (_wallhackTimers.TryRemove(steamId, out var removedTimer))
+                {
+                    removedTimer.Kill();
+                    if (_wallhackTimers.IsEmpty)
+                    {
+                        CleanupWallhack();
+                    }
+                }
+            });
+
+            _wallhackTimers.TryAdd(steamId, timer);
+
+            if (_wallhackTimers.Count == 1)
+            {
+                Listeners.OnCheckTransmit.Register(OnCheckTransmit);
+            }
+            ApplyGlowsToPlayers();
+        }
+
+        private void ApplyGlowsToPlayers()
+        {
+            CleanupGlowEntities();
+            foreach (var p in Utilities.GetPlayers())
+            {
+                if (p == null || !p.IsValid || !p.PawnIsAlive || p.IsBot) continue;
+
+                var pawn = p.PlayerPawn.Value;
+                if (pawn == null) continue;
+
+                var modelGlow = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic");
+                if (modelGlow == null) continue;
+
+                modelGlow.SetModel(pawn.CBodyComponent!.SceneNode!.GetSkeletonInstance().ModelState.ModelName);
+                modelGlow.DispatchSpawn();
+
+                modelGlow.Glow.GlowColorOverride = p.Team == CsTeam.Terrorist ? System.Drawing.Color.FromArgb(255, 255, 165, 0) : System.Drawing.Color.FromArgb(255, 173, 216, 230);
+                modelGlow.Glow.GlowRange = 5000;
+                modelGlow.Glow.GlowTeam = -1;
+                modelGlow.Glow.GlowType = 3;
+                modelGlow.Glow.GlowRangeMin = 100;
+
+                var modelRelay = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic");
+                if (modelRelay == null) continue;
+
+                modelRelay.SetModel(pawn.CBodyComponent!.SceneNode!.GetSkeletonInstance().ModelState.ModelName);
+                modelRelay.DispatchSpawn();
+                modelRelay.AcceptInput("FollowEntity", pawn, modelRelay, "!activator");
+
+                modelGlow.AcceptInput("FollowEntity", modelRelay, modelGlow, "!activator");
+
+                _glowEntities.Add((
+                    new CHandle<CDynamicProp>(modelRelay),
+                    new CHandle<CDynamicProp>(modelGlow)
+                ));
+            }
+        }
+
+        private static void OnCheckTransmit(CCheckTransmitInfoList infoList)
+        {
+            var instance = (PoE2ModRPG)Instance;
+            foreach (var info in infoList)
+            {
+                var player = info.Recipient?.Value;
+                if (player == null) continue;
+
+                var pawn = player.PlayerPawn.Value;
+                if (pawn == null) continue;
+
+                var observerServices = pawn.ObserverServices;
+                if (observerServices == null) continue;
+
+                var observerTarget = observerServices.ObserverTarget;
+                if (observerTarget == null || observerTarget.Value == null) continue;
+
+                CCSPlayerController? observedPlayer = null;
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p.Pawn.Value != null && p.Pawn.Value.Handle == observerTarget.Value.Handle)
+                    {
+                        observedPlayer = p;
+                        break;
+                    }
+                }
+
+                bool shouldSeeGlow = instance._wallhackTimers.ContainsKey(player.SteamID) || (observedPlayer != null && instance._wallhackTimers.ContainsKey(observedPlayer.SteamID));
+
+                if (!shouldSeeGlow)
+                {
+                    foreach ((CHandle<CDynamicProp> modelRelay, CHandle<CDynamicProp> modelGlow) in instance._glowEntities)
+                    {
+                        if (modelRelay.Value != null)
+                            info.TransmitEntities.Remove(modelRelay.Value.Index);
+
+                        if (modelGlow.Value != null)
+                            info.TransmitEntities.Remove(modelGlow.Value.Index);
+                    }
+                }
+            }
+        }
+
+        private void CleanupGlowEntities()
+        {
+            foreach (var (modelRelay, modelGlow) in _glowEntities)
+            {
+                if (modelRelay.Value != null)
+                    modelRelay.Value.Remove();
+
+                if (modelGlow.Value != null)
+                    modelGlow.Value.Remove();
+            }
+            _glowEntities.Clear();
+        }
+
+        private void CleanupWallhack()
+        {
+            if (_wallhackTimers.IsEmpty) return;
+
+            Listeners.OnCheckTransmit.Unregister(OnCheckTransmit);
+
+            foreach (var timer in _wallhackTimers.Values)
+            {
+                timer.Kill();
+            }
+            _wallhackTimers.Clear();
+            CleanupGlowEntities();
+        }
+        #endregion
+
+        #region HUD Logic
+        private void UpdateHud(CCSPlayerController player)
+        {
+            if (player == null || !player.IsValid) return;
+
+            var playerData = _playerService.GetPlayer(player.SteamID);
+            if (playerData == null) return;
+
+            var pawn = player.PlayerPawn.Value;
+            if (pawn == null) return;
+
+            int requiredExp = 100 + (playerData.Level - 1) * 50;
+
+            player.PrintToCenterHtml(
+                $"Poziom: {playerData.Level} | HP: {pawn.Health}/{pawn.MaxHealth} | Mana: {playerData.Mana}/{playerData.MaxMana} | EXP: {playerData.Exp}/{requiredExp}"
+            );
         }
         #endregion
 
         #region API Implementation
-        public Player? GetPlayer(ulong steamId) => _playerService.GetPlayer(steamId);
+        public Models.Player? GetPlayer(ulong steamId) => _playerService.GetPlayer(steamId);
         public int GetPlayerLevel(ulong steamId) => GetPlayer(steamId)?.Level ?? -1;
         public void AddExp(ulong steamId, int amount, string reason)
         {
